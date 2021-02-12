@@ -22,7 +22,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/couchbase/vellum"
+	"github.com/blevesearch/vellum"
 	"github.com/spf13/cobra"
 )
 

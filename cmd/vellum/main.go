@@ -17,7 +17,7 @@ package main
 import (
 	_ "expvar"
 
-	"github.com/couchbase/vellum/cmd/vellum/cmd"
+	"github.com/blevesearch/vellum/cmd/vellum/cmd"
 )
 
 func main() {

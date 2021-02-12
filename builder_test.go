@@ -239,9 +239,10 @@ func BenchmarkBuilder(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+
 		builder, err := New(ioutil.Discard, nil)
 		if err != nil {
-				b.Fatalf("error reseting builder: %v", err)
+			b.Fatalf("error creating builder: %v", err)
 		}
 		err = insertStrings(builder, dataset, randomThousandVals)
 		if err != nil {

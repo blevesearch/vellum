@@ -254,3 +254,30 @@ func BenchmarkBuilder(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkBuilderReuse(b *testing.B) {
+	dataset := thousandTestWords
+	randomThousandVals := randomValues(dataset)
+
+	b.ResetTimer()
+
+	builder, err := New(ioutil.Discard, nil)
+	if err != nil {
+		b.Fatalf("error creating builder: %v", err)
+	}
+	for i := 0; i < b.N; i++ {
+
+		err = builder.Reset(ioutil.Discard)
+		if err != nil {
+			b.Fatalf("error resetting builder: %v", err)
+		}
+		err = insertStrings(builder, dataset, randomThousandVals)
+		if err != nil {
+			b.Fatalf("error inserting thousand words: %v", err)
+		}
+		err = builder.Close()
+		if err != nil {
+			b.Fatalf("error closing builder: %v", err)
+		}
+	}
+}

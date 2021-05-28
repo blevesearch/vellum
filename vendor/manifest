@@ -34,8 +34,8 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/willf/bitset",
-			"repository": "https://github.com/willf/bitset",
+			"importpath": "github.com/bits-and-blooms/bitset",
+			"repository": "https://github.com/bits-and-blooms/bitset",
 			"vcs": "git",
 			"revision": "5c3c0fce48842b2c0bbaa99b4e61b0175d84b47c",
 			"branch": "master",

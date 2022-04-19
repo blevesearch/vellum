@@ -17,10 +17,12 @@ package vellum
 import (
 	"bytes"
 	"io"
+	"log"
 )
 
 var defaultBuilderOpts = &BuilderOpts{
 	Encoder:           1,
+	outType:           storeByteSlice,
 	RegistryTableSize: 10000,
 	RegistryMRUSize:   2,
 }
@@ -41,6 +43,7 @@ type Builder struct {
 	builderNodePool *builderNodePool
 }
 
+const storeByteSlice = 42
 const noneAddr = 1
 const emptyAddr = 0
 
@@ -61,9 +64,13 @@ func newBuilder(w io.Writer, opts *BuilderOpts) (*Builder, error) {
 
 	var err error
 	rv.encoder, err = loadEncoder(opts.Encoder, w)
+	if opts.outType&storeByteSlice > 0 {
+		rv.encoder.setOutputType(opts.outType)
+	}
 	if err != nil {
 		return nil, err
 	}
+	rv.unfinished.outType = opts.outType
 	err = rv.encoder.start()
 	if err != nil {
 		return nil, err
@@ -88,7 +95,7 @@ func (b *Builder) Reset(w io.Writer) error {
 
 // Insert the provided value to the set being built.
 // NOTE: values must be inserted in lexicographical order.
-func (b *Builder) Insert(key []byte, val uint64) error {
+func (b *Builder) Insert(key []byte, val interface{}) error {
 	// ensure items are added in lexicographic order
 	if bytes.Compare(key, b.last) < 0 {
 		return ErrOutOfOrder
@@ -101,6 +108,7 @@ func (b *Builder) Insert(key []byte, val uint64) error {
 
 	prefixLen, out := b.unfinished.findCommonPrefixAndSetOutput(key, val)
 	b.len++
+	log.Printf("inserting %v %s %v", prefixLen, key, out)
 	err := b.compileFrom(prefixLen)
 	if err != nil {
 		return err
@@ -153,9 +161,21 @@ func (b *Builder) compileFrom(iState int) error {
 	return nil
 }
 
+func (b *Builder) isEmptyFinalOutput(s *builderNode) bool {
+	switch b.opts.outType {
+	case storeByteSlice:
+		val, _ := s.finalOutput.([]byte)
+		return len(val) == 0
+	default:
+		val, _ := s.finalOutput.(int)
+		return val == 0
+	}
+
+}
+
 func (b *Builder) compile(node *builderNode) (int, error) {
 	if node.final && len(node.trans) == 0 &&
-		node.finalOutput == 0 {
+		b.isEmptyFinalOutput(node) {
 		return 0, nil
 	}
 	found, addr, entry := b.registry.entry(node)
@@ -181,8 +201,8 @@ type unfinishedNodes struct {
 	// same access pattern, and don't track items separately
 	// this means calls get() and pushXYZ() must be paired,
 	// as well as calls put() and popXYZ()
-	cache []builderNodeUnfinished
-
+	cache           []builderNodeUnfinished
+	outType         int
 	builderNodePool *builderNodePool
 }
 
@@ -222,14 +242,27 @@ func (u *unfinishedNodes) put() {
 	u.cache[len(u.stack)] = builderNodeUnfinished{}
 }
 
+func (u *unfinishedNodes) isEmptyFinalOutput(out interface{}) bool {
+	switch u.outType {
+	case storeByteSlice:
+		val, _ := out.([]byte)
+		return len(val) == 0
+	default:
+		val, _ := out.(int)
+		return val == 0
+	}
+
+}
+
 func (u *unfinishedNodes) findCommonPrefixAndSetOutput(key []byte,
-	out uint64) (int, uint64) {
+	out interface{}) (int, interface{}) {
 	var i int
 	for i < len(key) {
+		log.Printf("find common prefix and set output %v", len(u.stack))
 		if i >= len(u.stack) {
 			break
 		}
-		var addPrefix uint64
+		var addPrefix interface{}
 		if !u.stack[i].hasLastT {
 			break
 		}
@@ -243,7 +276,7 @@ func (u *unfinishedNodes) findCommonPrefixAndSetOutput(key []byte,
 			break
 		}
 
-		if addPrefix != 0 {
+		if !u.isEmptyFinalOutput(addPrefix) {
 			u.stack[i].addOutputPrefix(addPrefix)
 		}
 	}
@@ -286,17 +319,27 @@ func (u *unfinishedNodes) popEmpty() *builderNode {
 	return rv
 }
 
-func (u *unfinishedNodes) setRootOutput(out uint64) {
+func (u *unfinishedNodes) setRootOutput(out interface{}) {
 	u.stack[0].node.final = true
 	u.stack[0].node.finalOutput = out
 }
 
 func (u *unfinishedNodes) topLastFreeze(addr int) {
+	log.Printf("top last freeze %v", len(u.stack))
 	last := len(u.stack) - 1
 	u.stack[last].lastCompiled(addr)
 }
 
-func (u *unfinishedNodes) addSuffix(bs []byte, out uint64) {
+func (u *unfinishedNodes) zeroOutput() interface{} {
+	switch u.outType {
+	case storeByteSlice:
+		return []byte{}
+	default:
+		return 0
+	}
+}
+
+func (u *unfinishedNodes) addSuffix(bs []byte, out interface{}) {
 	if len(bs) == 0 {
 		return
 	}
@@ -304,12 +347,13 @@ func (u *unfinishedNodes) addSuffix(bs []byte, out uint64) {
 	u.stack[last].hasLastT = true
 	u.stack[last].lastIn = bs[0]
 	u.stack[last].lastOut = out
+	log.Printf("the output of top node %q %v", u.stack[last].lastIn, u.stack[last].lastOut)
 	for _, b := range bs[1:] {
 		next := u.get()
 		next.node = u.builderNodePool.Get()
 		next.hasLastT = true
 		next.lastIn = b
-		next.lastOut = 0
+		next.lastOut = u.zeroOutput()
 		u.stack = append(u.stack, next)
 	}
 	u.pushEmpty(true)
@@ -317,7 +361,7 @@ func (u *unfinishedNodes) addSuffix(bs []byte, out uint64) {
 
 type builderNodeUnfinished struct {
 	node     *builderNode
-	lastOut  uint64
+	lastOut  interface{}
 	lastIn   byte
 	hasLastT bool
 }
@@ -336,7 +380,7 @@ func (b *builderNodeUnfinished) lastCompiled(addr int) {
 	}
 }
 
-func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
+func (b *builderNodeUnfinished) addOutputPrefix(prefix interface{}) {
 	if b.node.final {
 		b.node.finalOutput = outputCat(prefix, b.node.finalOutput)
 	}
@@ -349,10 +393,10 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 }
 
 type builderNode struct {
-	finalOutput uint64
+	finalOutput interface{}
 	trans       []transition
 	final       bool
-
+	outType     int
 	// intrusive linked list
 	next *builderNode
 }
@@ -391,24 +435,71 @@ func (n *builderNode) equiv(o *builderNode) bool {
 }
 
 type transition struct {
-	out  uint64
+	out  interface{}
 	addr int
 	in   byte
 }
 
-func outputPrefix(l, r uint64) uint64 {
-	if l < r {
-		return l
+func byteSlicePrefixOffset(l, r interface{}) int {
+	_l, _ := l.([]byte)
+	_r, _ := r.([]byte)
+	prefIdx := 0
+	for i := range _l {
+		if i >= len(_r) || _l[i] != _r[i] {
+			break
+		}
+		prefIdx++
 	}
-	return r
+	return prefIdx
 }
 
-func outputSub(l, r uint64) uint64 {
-	return l - r
+func outputPrefix(l, r interface{}) interface{} {
+	_lb, ok := l.([]byte)
+	if ok {
+		return _lb[:byteSlicePrefixOffset(l, r)]
+	}
+	_l, _ := l.(int)
+	_r, _ := r.(int)
+
+	if _l < _r {
+		return _l
+	}
+	return _r
 }
 
-func outputCat(l, r uint64) uint64 {
-	return l + r
+func byteSliceSub(l, r interface{}) []byte {
+	_l, _ := l.([]byte)
+	_r, _ := r.([]byte)
+	return _l[byteSlicePrefixOffset(_l, _r):]
+}
+
+func outputSub(l, r interface{}) interface{} {
+	_, ok := l.([]byte)
+	if ok {
+		return byteSliceSub(l, r)
+	}
+	_l, _ := l.(int)
+	_r, _ := r.(int)
+	return _l - _r
+}
+
+func byteSliceCat(l, r interface{}) []byte {
+	_l, _ := l.([]byte)
+	_r, _ := r.([]byte)
+	var rv []byte
+	rv = append(rv, _l...)
+	rv = append(rv, _r...)
+	return rv
+}
+
+func outputCat(l, r interface{}) interface{} {
+	_, ok := l.([]byte)
+	if ok {
+		return byteSliceCat(l, r)
+	}
+	_l, _ := l.(int)
+	_r, _ := r.(int)
+	return _l + _r
 }
 
 // builderNodePool pools builderNodes using a singly linked list.

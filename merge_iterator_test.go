@@ -42,7 +42,7 @@ func TestMergeIterator(t *testing.T) {
 					"f": 6,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
+			merge: func(mvs []interface{}) interface{} {
 				return mvs[0]
 			},
 			want: map[string]uint64{
@@ -68,10 +68,10 @@ func TestMergeIterator(t *testing.T) {
 					"e": 6,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
-				var rv uint64
+			merge: func(mvs []interface{}) interface{} {
+				var rv interface{}
 				for _, mv := range mvs {
-					rv += mv
+					rv = cumulateOutput(rv, mv)
 				}
 				return rv
 			},
@@ -98,7 +98,7 @@ func TestMergeIterator(t *testing.T) {
 					"tank": 0,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
+			merge: func(mvs []interface{}) interface{} {
 				return mvs[0]
 			},
 			want: map[string]uint64{
@@ -134,7 +134,8 @@ func TestMergeIterator(t *testing.T) {
 			for err == nil {
 				currk, currv := mi.Current()
 				err = mi.Next()
-				got[string(currk)] = currv
+				currVal, _ := currv.(uint64)
+				got[string(currk)] = currVal
 			}
 			if err != nil && err != ErrIteratorDone {
 				t.Fatalf("error iterating: %v", err)
@@ -167,7 +168,7 @@ func newTestIterator(in map[string]uint64) (*testIterator, error) {
 	return rv, nil
 }
 
-func (m *testIterator) Current() ([]byte, uint64) {
+func (m *testIterator) Current() ([]byte, interface{}) {
 	if m.curr >= len(m.keys) {
 		return nil, 0
 	}
@@ -231,7 +232,11 @@ func TestMergeFunc(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got := test.merge(test.in)
+			var b []interface{}
+			for _, e := range test.in {
+				b = append(b, e)
+			}
+			got := test.merge(b)
 			if test.want != got {
 				t.Errorf("expected %d, got %d", test.want, got)
 			}

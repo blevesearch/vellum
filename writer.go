@@ -71,8 +71,23 @@ func (w *writer) WritePackedUint(v uint64) error {
 	n := packedSize(v)
 	return w.WritePackedUintIn(v, n)
 }
+func (w *writer) WritePackedOutput(v interface{}, n int) error {
+	val, ok := v.([]byte)
+	if ok {
+		//write byte slice
+		_, err := w.Write(val)
+		return err
+	}
+	valInt, _ := v.(uint64)
+	return w.WritePackedUintIn(valInt, n)
+}
 
-func packedSize(n uint64) int {
+func packedSize(in interface{}) int {
+	inBS, ok := in.([]byte)
+	if ok {
+		return len(inBS)
+	}
+	n, _ := in.(int)
 	if n < 1<<8 {
 		return 1
 	} else if n < 1<<16 {

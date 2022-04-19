@@ -119,6 +119,37 @@ func insertStrings(b *Builder, list []string, vals []uint64) error {
 	return nil
 }
 
+var bsSample = map[string][]byte{
+	"mon":   {0, 1},
+	"tues":  {1, 2},
+	"thurs": {1, 3},
+	"tye":   {1, 5, 4},
+}
+
+func insertBsSample(b *Builder, m map[string][]byte) error {
+	// make list of keys
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	// sort it
+	sort.Strings(keys)
+	// insert in sorted order
+	for _, k := range keys {
+		err := b.Insert([]byte(k), m[k])
+		if err != nil {
+			return err
+		}
+	}
+
+	// err := b.Insert([]byte(keys[0]), m[keys[0]])
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
+}
+
 var smallSample = map[string]uint64{
 	"mon":   2,
 	"tues":  3,

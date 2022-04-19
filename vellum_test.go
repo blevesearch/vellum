@@ -17,6 +17,7 @@ package vellum
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"os"
 	"reflect"
 	"testing"
@@ -68,7 +69,8 @@ func TestRoundTripSimple(t *testing.T) {
 	got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
-		key, val := itr.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itr.Next()
 	}
@@ -121,7 +123,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 
 	// now try accessing it through the Transducer interface
-	var val uint64
+	var val interface{}
 	exists, val = TransducerGet(fst, []byte("mon"))
 	if !exists {
 		t.Errorf("expected key 'mon' to exist, doesn't")
@@ -196,7 +198,8 @@ func TestRoundTripThousand(t *testing.T) {
 	got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
-		key, val := itr.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itr.Next()
 	}
@@ -268,7 +271,8 @@ func TestRoundTripEmpty(t *testing.T) {
 	got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
-		key, val := itr.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itr.Next()
 	}
@@ -278,6 +282,64 @@ func TestRoundTripEmpty(t *testing.T) {
 	if len(got) > 0 {
 		t.Errorf("expected not to see anything, got %v", got)
 	}
+}
+
+func TestByteSliceOutputType(t *testing.T) {
+	f, err := ioutil.TempFile("./", "vellum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// err = os.Remove(f.Name())
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+	}()
+
+	b, err := New(f, nil)
+	if err != nil {
+		t.Fatalf("error creating builder: %v", err)
+	}
+
+	err = insertBsSample(b, bsSample)
+	if err != nil {
+		t.Fatalf("error inserting: %v", err)
+	}
+
+	err = b.Close()
+	if err != nil {
+		t.Fatalf("error closing: %v", err)
+	}
+
+	fst, err := Open(f.Name())
+	if err != nil {
+		t.Fatalf("error loading set: %v", err)
+	}
+	defer func() {
+		err = fst.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// first check all the expected values
+	// got := map[string]uint64{}
+	itr, err := fst.Iterator(nil, nil)
+	for err == nil {
+		key, valI := itr.Current()
+		log.Printf("reading the fst %s => %v\n", key, valI)
+		err = itr.Next()
+	}
+	if err != ErrIteratorDone {
+		t.Errorf("iterator error: %v", err)
+	}
+	// if len(got) > 0 {
+	// 	t.Errorf("expected not to see anything, got %v", got)
+	// }
 }
 
 func TestRoundTripEmptyString(t *testing.T) {
@@ -333,7 +395,8 @@ func TestRoundTripEmptyString(t *testing.T) {
 	got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
-		key, val := itr.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itr.Next()
 	}
@@ -403,7 +466,8 @@ func TestRoundTripEmptyStringAndOthers(t *testing.T) {
 	got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
-		key, val := itr.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itr.Next()
 	}
@@ -568,7 +632,8 @@ func TestMerge(t *testing.T) {
 	got := map[string]uint64{}
 	itrc, err := fstc.Iterator(nil, nil)
 	for err == nil {
-		key, val := itrc.Current()
+		key, valI := itr.Current()
+		val, _ := valI.(uint64)
 		got[string(key)] = val
 		err = itrc.Next()
 	}

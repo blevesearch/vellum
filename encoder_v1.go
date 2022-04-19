@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 )
 
 const versionV1 = 1
@@ -33,13 +34,18 @@ func init() {
 }
 
 type encoderV1 struct {
-	bw *writer
+	bw         *writer
+	outputType int
 }
 
 func newEncoderV1(w io.Writer) *encoderV1 {
 	return &encoderV1{
 		bw: newWriter(w),
 	}
+}
+
+func (e *encoderV1) setOutputType(typ int) {
+	e.outputType = typ
 }
 
 func (e *encoderV1) reset(w io.Writer) {
@@ -49,7 +55,12 @@ func (e *encoderV1) reset(w io.Writer) {
 func (e *encoderV1) start() error {
 	header := make([]byte, headerSize)
 	binary.LittleEndian.PutUint64(header, versionV1)
-	binary.LittleEndian.PutUint64(header[8:], uint64(0)) // type
+	if e.outputType&storeByteSlice > 0 {
+		binary.LittleEndian.PutUint64(header[8:], uint64(storeByteSlice)) // type
+	} else {
+		binary.LittleEndian.PutUint64(header[8:], uint64(0))
+	}
+
 	n, err := e.bw.Write(header)
 	if err != nil {
 		return err
@@ -60,12 +71,34 @@ func (e *encoderV1) start() error {
 	return nil
 }
 
+func (e *encoderV1) isEmptyOutputSingleState(s *builderNode) bool {
+	switch e.outputType {
+	case storeByteSlice:
+		val, _ := s.trans[0].out.([]byte)
+		return len(val) == 0
+	default:
+		val, _ := s.trans[0].out.(int)
+		return val == 0
+	}
+}
+
+func (e *encoderV1) isEmptyFinalOutput(s *builderNode) bool {
+	switch e.outputType {
+	case storeByteSlice:
+		val, _ := s.finalOutput.([]byte)
+		return len(val) == 0
+	default:
+		val, _ := s.finalOutput.(int)
+		return val == 0
+	}
+}
+
 func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
-	if len(s.trans) == 0 && s.final && s.finalOutput == 0 {
+	if len(s.trans) == 0 && s.final && e.isEmptyFinalOutput(s) {
 		return 0, nil
 	} else if len(s.trans) != 1 || s.final {
 		return e.encodeStateMany(s)
-	} else if !s.final && s.trans[0].out == 0 && s.trans[0].addr == lastAddr {
+	} else if !s.final && e.isEmptyOutputSingleState(s) && s.trans[0].addr == lastAddr {
 		return e.encodeStateOneFinish(s, transitionNext)
 	}
 	return e.encodeStateOne(s)
@@ -74,9 +107,10 @@ func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
 func (e *encoderV1) encodeStateOne(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	outPackSize := 0
-	if s.trans[0].out != 0 {
+	if !e.isEmptyOutputSingleState(s) {
 		outPackSize = packedSize(s.trans[0].out)
-		err := e.bw.WritePackedUintIn(s.trans[0].out, outPackSize)
+		log.Printf("the output size %v\n", outPackSize)
+		err := e.bw.WritePackedOutput(s.trans[0].out, outPackSize)
 		if err != nil {
 			return 0, err
 		}
@@ -115,6 +149,7 @@ func (e *encoderV1) encodeStateOneFinish(s *builderNode, next byte) (int, error)
 	return e.bw.counter - 1, nil
 }
 
+// need to see how would a []byte output fuck up this api
 func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	transPackSize := 0
@@ -139,14 +174,14 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	if anyOutputs {
 		// output final value
 		if s.final {
-			err := e.bw.WritePackedUintIn(s.finalOutput, outPackSize)
+			err := e.bw.WritePackedOutput(s.finalOutput, outPackSize)
 			if err != nil {
 				return 0, err
 			}
 		}
 		// output transition values (in reverse)
 		for j := len(s.trans) - 1; j >= 0; j-- {
-			err := e.bw.WritePackedUintIn(s.trans[j].out, outPackSize)
+			err := e.bw.WritePackedOutput(s.trans[j].out, outPackSize)
 			if err != nil {
 				return 0, err
 			}
@@ -161,7 +196,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 			return 0, err
 		}
 	}
-
+	// why is there no commoninput transformation here?
 	// output transition keys (in reverse)
 	for j := len(s.trans) - 1; j >= 0; j-- {
 		err := e.bw.WriteByte(s.trans[j].in)
@@ -178,6 +213,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 
 	numTrans := encodeNumTrans(len(s.trans))
 
+	// hwat is this?
 	// if number of transitions wont fit in edge header byte
 	// write out separately
 	if numTrans == 0 {

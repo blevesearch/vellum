@@ -33,6 +33,7 @@ type encoder interface {
 	encodeState(s *builderNode, addr int) (int, error)
 	finish(count, rootAddr int) error
 	reset(w io.Writer)
+	setOutputType(typ int)
 }
 
 func loadEncoder(ver int, w io.Writer) (encoder, error) {
@@ -80,8 +81,8 @@ func decodeHeader(header []byte) (ver int, typ int, err error) {
 type fstState interface {
 	Address() int
 	Final() bool
-	FinalOutput() uint64
+	FinalOutput() interface{}
 	NumTransitions() int
-	TransitionFor(b byte) (int, int, uint64)
+	TransitionFor(b byte) (int, int, interface{})
 	TransitionAt(i int) byte
 }

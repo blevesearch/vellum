@@ -55,6 +55,7 @@ var ErrIteratorDone = errors.New("iterator-done")
 // of the builder and some aspects of the generated FST.
 type BuilderOpts struct {
 	Encoder           int
+	outType           int
 	RegistryTableSize int
 	RegistryMRUSize   int
 }

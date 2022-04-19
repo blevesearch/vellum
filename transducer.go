@@ -22,11 +22,11 @@ type Transducer interface {
 
 	// IsMatchWithValue returns true if and only if the state is a match
 	// additionally it returns a states final value (if any)
-	IsMatchWithVal(int) (bool, uint64)
+	IsMatchWithVal(int) (bool, interface{})
 
 	// Accept returns the next state given the input to the specified state
 	// additionally it returns the value associated with the transition
-	AcceptWithVal(int, byte) (int, uint64)
+	AcceptWithVal(int, byte) (int, interface{})
 }
 
 // TransducerGet implements an generic Get() method which works
@@ -34,22 +34,23 @@ type Transducer interface {
 // The caller MUST check the boolean return value for a match.
 // Zero is a valid value regardless of match status,
 // and if it is NOT a match, the value collected so far is returned.
-func TransducerGet(t Transducer, k []byte) (bool, uint64) {
-	var total uint64
+func TransducerGet(t Transducer, k []byte) (bool, interface{}) {
+	var total interface{}
 	i := 0
 	curr := t.Start()
 	for t.CanMatch(curr) && i < len(k) {
-		var transVal uint64
+		var transVal interface{}
 		curr, transVal = t.AcceptWithVal(curr, k[i])
 		if curr == noneAddr {
 			break
 		}
-		total += transVal
+		total = cumulateOutput(total, transVal)
+		// total += transVal
 		i++
 	}
 	if i != len(k) {
 		return false, total
 	}
 	match, finalVal := t.IsMatchWithVal(curr)
-	return match, total + finalVal
+	return match, cumulateOutput(total, finalVal)
 }

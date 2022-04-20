@@ -68,9 +68,9 @@ func (f *FST) Get(input []byte) (interface{}, bool, error) {
 }
 
 func cumulateOutput(total interface{}, output interface{}) interface{} {
-	totalVal, ok := total.([]byte)
+	outBS, ok := output.([]byte)
 	if ok {
-		outBS, _ := output.([]byte)
+		totalVal, _ := total.([]byte)
 		totalVal = append(totalVal, outBS...)
 		return totalVal
 	}

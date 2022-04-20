@@ -120,10 +120,10 @@ func insertStrings(b *Builder, list []string, vals []uint64) error {
 }
 
 var bsSample = map[string][]byte{
-	"mon":   {0, 1},
-	"tues":  {1, 2},
-	"thurs": {1, 3},
-	"tye":   {1, 5, 4},
+	"mon":  {0, 1},
+	"tues": {1, 2},
+	// "thurs": {1, 3},
+	// "tye":   {1, 5, 4},
 }
 
 func insertBsSample(b *Builder, m map[string][]byte) error {

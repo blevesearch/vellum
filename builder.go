@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"reflect"
 )
 
 var defaultBuilderOpts = &BuilderOpts{
@@ -409,11 +410,23 @@ func (n *builderNode) reset() {
 	n.next = nil
 }
 
+func areOutputsEquiv(l interface{}, r interface{}) bool {
+	lv, ok := l.([]byte)
+	if ok {
+		rv, _ := r.([]byte)
+		return reflect.DeepEqual(lv, rv)
+	}
+
+	lIn, _ := l.(uint64)
+	rIn, _ := r.(uint64)
+	return lIn == rIn
+}
+
 func (n *builderNode) equiv(o *builderNode) bool {
 	if n.final != o.final {
 		return false
 	}
-	if n.finalOutput != o.finalOutput {
+	if !areOutputsEquiv(n.finalOutput, o.finalOutput) {
 		return false
 	}
 	if len(n.trans) != len(o.trans) {
@@ -427,7 +440,7 @@ func (n *builderNode) equiv(o *builderNode) bool {
 		if ntrans.addr != otrans.addr {
 			return false
 		}
-		if ntrans.out != otrans.out {
+		if !areOutputsEquiv(ntrans.out, otrans.out) {
 			return false
 		}
 	}

@@ -294,10 +294,6 @@ func TestByteSliceOutputType(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// err = os.Remove(f.Name())
-		// if err != nil {
-		// 	t.Fatal(err)
-		// }
 	}()
 
 	b, err := New(f, nil)
@@ -326,20 +322,16 @@ func TestByteSliceOutputType(t *testing.T) {
 		}
 	}()
 
-	// first check all the expected values
-	// got := map[string]uint64{}
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, valI := itr.Current()
+		//verfiying by printing the key value pairs for now
 		log.Printf("reading the fst %s => %v\n", key, valI)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
 		t.Errorf("iterator error: %v", err)
 	}
-	// if len(got) > 0 {
-	// 	t.Errorf("expected not to see anything, got %v", got)
-	// }
 }
 
 func TestRoundTripEmptyString(t *testing.T) {

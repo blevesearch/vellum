@@ -16,6 +16,7 @@ package vellum
 
 import (
 	"io"
+	"log"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -87,6 +88,7 @@ func (f *FST) get(input []byte, prealloc fstState) (interface{}, bool, error) {
 		return 0, false, err
 	}
 	for _, c := range input {
+		log.Printf("the chars %q\n", c)
 		_, curr, output := state.TransitionFor(c)
 		if curr == noneAddr {
 			return 0, false, nil

@@ -204,6 +204,7 @@ func (f *fstStateV1) atMulti(data []byte, addr int) error {
 	f.transSize, f.outSize = decodePackSize(data[f.bottom])
 
 	f.transTop = f.bottom
+	log.Printf("the number of transiitions %v %v %v\n", f.numTrans, f.transSize, f.outSize)
 	f.bottom -= f.numTrans // one byte for each transition
 	f.transBottom = f.bottom
 
@@ -268,6 +269,7 @@ func (f *fstStateV1) TransitionFor(b byte) (int, int, interface{}) {
 		return -1, noneAddr, f.zeroOutput()
 	}
 	transitionKeys := f.data[f.transBottom:f.transTop]
+	log.Printf("transition for %q\n", b)
 	pos := bytes.IndexByte(transitionKeys, b)
 	if pos < 0 {
 		return -1, noneAddr, f.zeroOutput()
@@ -284,7 +286,7 @@ func (f *fstStateV1) TransitionFor(b byte) (int, int, interface{}) {
 		out = f.readOutput(transVals[pos*f.outSize : pos*f.outSize+f.outSize])
 
 	}
-	log.Printf("fst state output %v %v\n", f.outSize, out)
+	log.Printf("fst state output %v %v %v %v\n", f.numTrans, f.transSize, f.outSize, out)
 	return f.numTrans - pos - 1, dest, out
 }
 

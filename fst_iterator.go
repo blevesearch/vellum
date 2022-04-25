@@ -168,7 +168,7 @@ func (i *FSTIterator) pointTo(key []byte) error {
 // returned an error previously, it may return nil,0.
 func (i *FSTIterator) Current() ([]byte, interface{}) {
 	curr := i.statesStack[len(i.statesStack)-1]
-	log.Printf("fst iterator vals stack %v\n", i.valsStack)
+	log.Printf("fst iterator vals stack %s\n", i.keysStack)
 	if curr.Final() {
 		var total interface{}
 		for _, v := range i.valsStack {
@@ -242,6 +242,7 @@ OUTER:
 			// push onto stack
 			next, err := i.f.decoder.stateAt(nextAddr, nextPrealloc)
 			if err != nil {
+				log.Printf("error over here\n")
 				return err
 			}
 

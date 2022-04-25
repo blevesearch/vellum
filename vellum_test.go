@@ -285,12 +285,16 @@ func TestRoundTripEmpty(t *testing.T) {
 }
 
 func TestByteSliceOutputType(t *testing.T) {
-	f, err := ioutil.TempFile("./", "vellum")
+	f, err := ioutil.TempFile("", "vellum")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		err = f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.Remove(f.Name())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -321,7 +325,10 @@ func TestByteSliceOutputType(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-
+	log.Printf("-------------------")
+	output, pres, err := fst.Get([]byte("tues"))
+	log.Printf("the get method on fst %v %v %v\n", output, pres, err)
+	log.Printf("-------------------")
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, valI := itr.Current()

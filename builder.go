@@ -365,14 +365,24 @@ type builderNodeUnfinished struct {
 	lastOut  interface{}
 	lastIn   byte
 	hasLastT bool
+	outType  int
 }
 
+func (f *builderNodeUnfinished) zeroOutput() interface{} {
+	switch f.outType {
+	case storeByteSlice:
+		return []byte{}
+	default:
+		return 0
+	}
+}
 func (b *builderNodeUnfinished) lastCompiled(addr int) {
 	if b.hasLastT {
+		log.Printf("compiling... %q %v\n", b.lastIn, b.lastOut)
 		transIn := b.lastIn
 		transOut := b.lastOut
 		b.hasLastT = false
-		b.lastOut = 0
+		b.lastOut = b.zeroOutput()
 		b.node.trans = append(b.node.trans, transition{
 			in:   transIn,
 			out:  transOut,

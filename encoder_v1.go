@@ -97,6 +97,7 @@ func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
 	if len(s.trans) == 0 && s.final && e.isEmptyFinalOutput(s) {
 		return 0, nil
 	} else if len(s.trans) != 1 || s.final {
+		log.Printf("reached here===========\n")
 		return e.encodeStateMany(s)
 	} else if !s.final && e.isEmptyOutputSingleState(s) && s.trans[0].addr == lastAddr {
 		return e.encodeStateOneFinish(s, transitionNext)
@@ -149,12 +150,22 @@ func (e *encoderV1) encodeStateOneFinish(s *builderNode, next byte) (int, error)
 	return e.bw.counter - 1, nil
 }
 
-// need to see how would a []byte output fuck up this api
+func (e *encoderV1) isTransOutEmpty(t *transition) bool {
+	switch e.outputType {
+	case storeByteSlice:
+		val, _ := t.out.([]byte)
+		return len(val) == 0
+	default:
+		val, _ := t.out.(int)
+		return val == 0
+	}
+}
+
 func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	transPackSize := 0
 	outPackSize := packedSize(s.finalOutput)
-	anyOutputs := s.finalOutput != 0
+	anyOutputs := !e.isEmptyFinalOutput(s)
 	for i := range s.trans {
 		delta := deltaAddr(start, uint64(s.trans[i].addr))
 		tsize := packedSize(delta)
@@ -165,7 +176,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 		if osize > outPackSize {
 			outPackSize = osize
 		}
-		anyOutputs = anyOutputs || s.trans[i].out != 0
+		anyOutputs = anyOutputs || !e.isTransOutEmpty(&s.trans[i])
 	}
 	if !anyOutputs {
 		outPackSize = 0
@@ -212,8 +223,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	}
 
 	numTrans := encodeNumTrans(len(s.trans))
-
-	// hwat is this?
+	log.Printf("THE NUMBER OF TRANSITIONS %v", numTrans)
 	// if number of transitions wont fit in edge header byte
 	// write out separately
 	if numTrans == 0 {

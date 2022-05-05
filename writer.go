@@ -67,6 +67,25 @@ func (w *writer) WritePackedUintIn(v uint64, n int) error {
 	return nil
 }
 
+func (w *writer) WriteByteSlice(v []byte, n int) error {
+	for shift := 0; shift < n; shift++ {
+		if shift >= len(v) {
+			// using 0 may not be a good idea, need to figure out the decoder part of this
+			err := w.WriteByte(byte(0))
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		err := w.WriteByte(byte(v[shift]))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (w *writer) WritePackedUint(v uint64) error {
 	n := packedSize(v)
 	return w.WritePackedUintIn(v, n)
@@ -75,8 +94,7 @@ func (w *writer) WritePackedOutput(v interface{}, n int) error {
 	val, ok := v.([]byte)
 	if ok {
 		//write byte slice
-		_, err := w.Write(val)
-		return err
+		return w.WriteByteSlice(val, n)
 	}
 	valInt, _ := v.(uint64)
 	return w.WritePackedUintIn(valInt, n)
@@ -87,7 +105,7 @@ func packedSize(in interface{}) int {
 	if ok {
 		return len(inBS)
 	}
-	n, _ := in.(int)
+	n, _ := in.(uint64)
 	if n < 1<<8 {
 		return 1
 	} else if n < 1<<16 {

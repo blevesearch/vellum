@@ -126,7 +126,6 @@ func (i *FSTIterator) pointTo(key []byte) error {
 		keyJ := key[j]
 		curr := i.statesStack[len(i.statesStack)-1]
 		autCurr := i.autStatesStack[len(i.autStatesStack)-1]
-		log.Printf("fst iterator key[i] %q\n", keyJ)
 		pos, nextAddr, nextVal := curr.TransitionFor(keyJ)
 		if nextAddr == noneAddr {
 			// needed transition doesn't exist
@@ -168,7 +167,6 @@ func (i *FSTIterator) pointTo(key []byte) error {
 // returned an error previously, it may return nil,0.
 func (i *FSTIterator) Current() ([]byte, interface{}) {
 	curr := i.statesStack[len(i.statesStack)-1]
-	log.Printf("fst iterator vals stack %s\n", i.keysStack)
 	if curr.Final() {
 		var total interface{}
 		for _, v := range i.valsStack {

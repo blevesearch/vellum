@@ -16,7 +16,6 @@ package vellum
 
 import (
 	"io"
-	"log"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -75,8 +74,8 @@ func cumulateOutput(total interface{}, output interface{}) interface{} {
 		totalVal = append(totalVal, outBS...)
 		return totalVal
 	}
-	totalInt, _ := total.(int)
-	outInt, _ := output.(int)
+	totalInt, _ := total.(uint64)
+	outInt, _ := output.(uint64)
 	return totalInt + outInt
 }
 
@@ -88,7 +87,6 @@ func (f *FST) get(input []byte, prealloc fstState) (interface{}, bool, error) {
 		return 0, false, err
 	}
 	for _, c := range input {
-		log.Printf("the chars %q\n", c)
 		_, curr, output := state.TransitionFor(c)
 		if curr == noneAddr {
 			return 0, false, nil

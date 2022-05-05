@@ -17,7 +17,6 @@ package vellum
 import (
 	"bytes"
 	"io"
-	"log"
 	"reflect"
 )
 
@@ -109,7 +108,6 @@ func (b *Builder) Insert(key []byte, val interface{}) error {
 
 	prefixLen, out := b.unfinished.findCommonPrefixAndSetOutput(key, val)
 	b.len++
-	log.Printf("inserting %v %s %v", prefixLen, key, out)
 	err := b.compileFrom(prefixLen)
 	if err != nil {
 		return err
@@ -153,6 +151,7 @@ func (b *Builder) compileFrom(iState int) error {
 			node = b.unfinished.popFreeze(addr)
 		}
 		var err error
+		node.outType = b.opts.outType
 		addr, err = b.compile(node)
 		if err != nil {
 			return nil
@@ -168,7 +167,7 @@ func (b *Builder) isEmptyFinalOutput(s *builderNode) bool {
 		val, _ := s.finalOutput.([]byte)
 		return len(val) == 0
 	default:
-		val, _ := s.finalOutput.(int)
+		val, _ := s.finalOutput.(uint64)
 		return val == 0
 	}
 
@@ -249,7 +248,7 @@ func (u *unfinishedNodes) isEmptyFinalOutput(out interface{}) bool {
 		val, _ := out.([]byte)
 		return len(val) == 0
 	default:
-		val, _ := out.(int)
+		val, _ := out.(uint64)
 		return val == 0
 	}
 
@@ -259,7 +258,6 @@ func (u *unfinishedNodes) findCommonPrefixAndSetOutput(key []byte,
 	out interface{}) (int, interface{}) {
 	var i int
 	for i < len(key) {
-		log.Printf("find common prefix and set output %v", len(u.stack))
 		if i >= len(u.stack) {
 			break
 		}
@@ -326,7 +324,6 @@ func (u *unfinishedNodes) setRootOutput(out interface{}) {
 }
 
 func (u *unfinishedNodes) topLastFreeze(addr int) {
-	log.Printf("top last freeze %v", len(u.stack))
 	last := len(u.stack) - 1
 	u.stack[last].lastCompiled(addr)
 }
@@ -348,7 +345,6 @@ func (u *unfinishedNodes) addSuffix(bs []byte, out interface{}) {
 	u.stack[last].hasLastT = true
 	u.stack[last].lastIn = bs[0]
 	u.stack[last].lastOut = out
-	log.Printf("the output of top node %q %v", u.stack[last].lastIn, u.stack[last].lastOut)
 	for _, b := range bs[1:] {
 		next := u.get()
 		next.node = u.builderNodePool.Get()
@@ -378,7 +374,6 @@ func (f *builderNodeUnfinished) zeroOutput() interface{} {
 }
 func (b *builderNodeUnfinished) lastCompiled(addr int) {
 	if b.hasLastT {
-		log.Printf("compiling... %q %v\n", b.lastIn, b.lastOut)
 		transIn := b.lastIn
 		transOut := b.lastOut
 		b.hasLastT = false
@@ -481,8 +476,8 @@ func outputPrefix(l, r interface{}) interface{} {
 	if ok {
 		return _lb[:byteSlicePrefixOffset(l, r)]
 	}
-	_l, _ := l.(int)
-	_r, _ := r.(int)
+	_l, _ := l.(uint64)
+	_r, _ := r.(uint64)
 
 	if _l < _r {
 		return _l
@@ -501,8 +496,8 @@ func outputSub(l, r interface{}) interface{} {
 	if ok {
 		return byteSliceSub(l, r)
 	}
-	_l, _ := l.(int)
-	_r, _ := r.(int)
+	_l, _ := l.(uint64)
+	_r, _ := r.(uint64)
 	return _l - _r
 }
 
@@ -520,8 +515,8 @@ func outputCat(l, r interface{}) interface{} {
 	if ok {
 		return byteSliceCat(l, r)
 	}
-	_l, _ := l.(int)
-	_r, _ := r.(int)
+	_l, _ := l.(uint64)
+	_r, _ := r.(uint64)
 	return _l + _r
 }
 

@@ -18,7 +18,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 )
 
 const versionV1 = 1
@@ -71,17 +70,6 @@ func (e *encoderV1) start() error {
 	return nil
 }
 
-func (e *encoderV1) isEmptyOutputSingleState(s *builderNode) bool {
-	switch e.outputType {
-	case storeByteSlice:
-		val, _ := s.trans[0].out.([]byte)
-		return len(val) == 0
-	default:
-		val, _ := s.trans[0].out.(int)
-		return val == 0
-	}
-}
-
 func (e *encoderV1) isEmptyFinalOutput(s *builderNode) bool {
 	switch e.outputType {
 	case storeByteSlice:
@@ -97,9 +85,8 @@ func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
 	if len(s.trans) == 0 && s.final && e.isEmptyFinalOutput(s) {
 		return 0, nil
 	} else if len(s.trans) != 1 || s.final {
-		log.Printf("reached here===========\n")
 		return e.encodeStateMany(s)
-	} else if !s.final && e.isEmptyOutputSingleState(s) && s.trans[0].addr == lastAddr {
+	} else if !s.final && e.isTransOutEmpty(&s.trans[0]) && s.trans[0].addr == lastAddr {
 		return e.encodeStateOneFinish(s, transitionNext)
 	}
 	return e.encodeStateOne(s)
@@ -108,9 +95,8 @@ func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
 func (e *encoderV1) encodeStateOne(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	outPackSize := 0
-	if !e.isEmptyOutputSingleState(s) {
+	if !e.isTransOutEmpty(&s.trans[0]) {
 		outPackSize = packedSize(s.trans[0].out)
-		log.Printf("the output size %v\n", outPackSize)
 		err := e.bw.WritePackedOutput(s.trans[0].out, outPackSize)
 		if err != nil {
 			return 0, err
@@ -156,7 +142,7 @@ func (e *encoderV1) isTransOutEmpty(t *transition) bool {
 		val, _ := t.out.([]byte)
 		return len(val) == 0
 	default:
-		val, _ := t.out.(int)
+		val, _ := t.out.(uint64)
 		return val == 0
 	}
 }
@@ -223,7 +209,6 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	}
 
 	numTrans := encodeNumTrans(len(s.trans))
-	log.Printf("THE NUMBER OF TRANSITIONS %v", numTrans)
 	// if number of transitions wont fit in edge header byte
 	// write out separately
 	if numTrans == 0 {

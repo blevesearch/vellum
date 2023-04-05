@@ -284,8 +284,8 @@ func TestRoundTripEmpty(t *testing.T) {
 	}
 }
 
-func TestByteSliceOutputType(t *testing.T) {
-	f, err := ioutil.TempFile("", "vellum")
+func TestIntSliceOutputType(t *testing.T) {
+	f, err := ioutil.TempFile("./", "vellum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestByteSliceOutputType(t *testing.T) {
 		}
 	}()
 	log.Printf("-------------------")
-	output, pres, err := fst.Get([]byte("mon"))
+	output, pres, err := fst.Get([]byte("tye"))
 	log.Printf("the get method on fst %v %v %v\n", output, pres, err)
 	log.Printf("-------------------")
 	itr, err := fst.Iterator(nil, nil)
@@ -335,6 +335,9 @@ func TestByteSliceOutputType(t *testing.T) {
 		//verfiying by printing the key value pairs for now
 		log.Printf("reading the fst %s => %v\n", key, valI)
 		err = itr.Next()
+		if err != nil {
+			log.Printf("the error is %v\n", err)
+		}
 	}
 	if err != ErrIteratorDone {
 		t.Errorf("iterator error: %v", err)

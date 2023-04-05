@@ -22,7 +22,7 @@ import (
 
 var defaultBuilderOpts = &BuilderOpts{
 	Encoder:           1,
-	outType:           storeByteSlice,
+	outType:           storeIntSlice,
 	RegistryTableSize: 10000,
 	RegistryMRUSize:   2,
 }
@@ -43,7 +43,7 @@ type Builder struct {
 	builderNodePool *builderNodePool
 }
 
-const storeByteSlice = 42
+const storeIntSlice = 42
 const noneAddr = 1
 const emptyAddr = 0
 
@@ -64,7 +64,7 @@ func newBuilder(w io.Writer, opts *BuilderOpts) (*Builder, error) {
 
 	var err error
 	rv.encoder, err = loadEncoder(opts.Encoder, w)
-	if opts.outType&storeByteSlice > 0 {
+	if opts.outType&storeIntSlice > 0 {
 		rv.encoder.setOutputType(opts.outType)
 	}
 	if err != nil {
@@ -163,8 +163,9 @@ func (b *Builder) compileFrom(iState int) error {
 
 func (b *Builder) isEmptyFinalOutput(s *builderNode) bool {
 	switch b.opts.outType {
-	case storeByteSlice:
-		val, _ := s.finalOutput.([]byte)
+	case storeIntSlice:
+		// or what about nil []uint64?
+		val, _ := s.finalOutput.([]uint64)
 		return len(val) == 0
 	default:
 		val, _ := s.finalOutput.(uint64)
@@ -244,8 +245,8 @@ func (u *unfinishedNodes) put() {
 
 func (u *unfinishedNodes) isEmptyFinalOutput(out interface{}) bool {
 	switch u.outType {
-	case storeByteSlice:
-		val, _ := out.([]byte)
+	case storeIntSlice:
+		val, _ := out.([]uint64)
 		return len(val) == 0
 	default:
 		val, _ := out.(uint64)
@@ -330,8 +331,8 @@ func (u *unfinishedNodes) topLastFreeze(addr int) {
 
 func (u *unfinishedNodes) zeroOutput() interface{} {
 	switch u.outType {
-	case storeByteSlice:
-		return []byte{}
+	case storeIntSlice:
+		return []uint64{}
 	default:
 		return 0
 	}
@@ -366,8 +367,8 @@ type builderNodeUnfinished struct {
 
 func (f *builderNodeUnfinished) zeroOutput() interface{} {
 	switch f.outType {
-	case storeByteSlice:
-		return []byte{}
+	case storeIntSlice:
+		return []uint64{}
 	default:
 		return 0
 	}
@@ -416,9 +417,10 @@ func (n *builderNode) reset() {
 }
 
 func areOutputsEquiv(l interface{}, r interface{}) bool {
-	lv, ok := l.([]byte)
+	lv, ok := l.([]uint64)
 	if ok {
-		rv, _ := r.([]byte)
+		rv, _ := r.([]uint64)
+		// is this fine or do we do something else?
 		return reflect.DeepEqual(lv, rv)
 	}
 
@@ -458,9 +460,9 @@ type transition struct {
 	in   byte
 }
 
-func byteSlicePrefixOffset(l, r interface{}) int {
-	_l, _ := l.([]byte)
-	_r, _ := r.([]byte)
+func intSlicePrefixOffset(l, r interface{}) int {
+	_l, _ := l.([]uint64)
+	_r, _ := r.([]uint64)
 	prefIdx := 0
 	for i := range _l {
 		if i >= len(_r) || _l[i] != _r[i] {
@@ -472,9 +474,9 @@ func byteSlicePrefixOffset(l, r interface{}) int {
 }
 
 func outputPrefix(l, r interface{}) interface{} {
-	_lb, ok := l.([]byte)
+	_lb, ok := l.([]uint64)
 	if ok {
-		return _lb[:byteSlicePrefixOffset(l, r)]
+		return _lb[:intSlicePrefixOffset(l, r)]
 	}
 	_l, _ := l.(uint64)
 	_r, _ := r.(uint64)
@@ -485,35 +487,35 @@ func outputPrefix(l, r interface{}) interface{} {
 	return _r
 }
 
-func byteSliceSub(l, r interface{}) []byte {
-	_l, _ := l.([]byte)
-	_r, _ := r.([]byte)
-	return _l[byteSlicePrefixOffset(_l, _r):]
+func intSliceSub(l, r interface{}) []uint64 {
+	_l, _ := l.([]uint64)
+	_r, _ := r.([]uint64)
+	return _l[intSlicePrefixOffset(_l, _r):]
 }
 
 func outputSub(l, r interface{}) interface{} {
-	_, ok := l.([]byte)
+	_, ok := l.([]uint64)
 	if ok {
-		return byteSliceSub(l, r)
+		return intSliceSub(l, r)
 	}
 	_l, _ := l.(uint64)
 	_r, _ := r.(uint64)
 	return _l - _r
 }
 
-func byteSliceCat(l, r interface{}) []byte {
-	_l, _ := l.([]byte)
-	_r, _ := r.([]byte)
-	var rv []byte
+func intSliceCat(l, r interface{}) []uint64 {
+	_l, _ := l.([]uint64)
+	_r, _ := r.([]uint64)
+	var rv []uint64
 	rv = append(rv, _l...)
 	rv = append(rv, _r...)
 	return rv
 }
 
 func outputCat(l, r interface{}) interface{} {
-	_, ok := l.([]byte)
+	_, ok := l.([]uint64)
 	if ok {
-		return byteSliceCat(l, r)
+		return intSliceCat(l, r)
 	}
 	_l, _ := l.(uint64)
 	_r, _ := r.(uint64)
@@ -527,12 +529,13 @@ func outputCat(l, r interface{}) interface{} {
 // |    Unfinished Nodes    |      Transfer once         |        Registry      |
 // |(not frozen builderNode)|-----builderNode is ------->| (frozen builderNode) |
 // +------------------------+      marked frozen         +----------------------+
-//              ^                                                     |
-//              |                                                     |
-//              |                                                   Put()
-//              | Get() on        +-------------------+             when
-//              +-new char--------| builderNode Pool  |<-----------evicted
-//                                +-------------------+
+//
+//	^                                                     |
+//	|                                                     |
+//	|                                                   Put()
+//	| Get() on        +-------------------+             when
+//	+-new char--------| builderNode Pool  |<-----------evicted
+//	                  +-------------------+
 type builderNodePool struct {
 	head *builderNode
 }

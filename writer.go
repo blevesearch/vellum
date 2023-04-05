@@ -16,7 +16,9 @@ package vellum
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"log"
 )
 
 // A writer is a buffered writer used by vellum. It counts how many bytes have
@@ -82,7 +84,7 @@ func (w *writer) WriteByteSlice(v []byte, n int) error {
 			return err
 		}
 	}
-
+	log.Printf("writer says %v %v\n", v, n)
 	return nil
 }
 
@@ -90,22 +92,118 @@ func (w *writer) WritePackedUint(v uint64) error {
 	n := packedSize(v)
 	return w.WritePackedUintIn(v, n)
 }
+
+// each int in the array is varuint encoded, so each number's
+// on disk size could vary hence we'd need to maintain an array,
+// the ith element corresponds to the size of the ith element in
+// in the intSlice.
+// The format would look something like this ?
+//
+//	     1 byte						  sum(sizesArray) bytes
+//	<lenArray/sizesArrayPackSize>              <<array>>
+
+func (w *writer) WriteIntSlice(intSlice []uint64, totalPackSize int) error {
+	var totalSizeWritten int
+	var n int
+	// FYI: traverse and write in reverse order
+	// for _, val := range intSlice {
+	// 	// n = packedIntSize(val)
+	// 	// m corresponds to the packed size of the val's pack size.
+	// 	// we want to find the max such pack size which would be
+	// 	// written as sizesArrayPackSize
+	// 	// because each element in the array of varying size,
+	// 	// and we want to store each of those sizes in the sizesArray
+	// 	// it makes sense to encode them as per a fixed sizesArrayPackSize
+	// 	// so that we can retrieve the same while decoding by just slicing
+	// 	// the data array.
+	// 	// m := packedIntSize(uint64(n))
+	// 	// sizesArrayPackSize = max(sizesArrayPackSize, m)
+	// }
+	maxSize := 0
+	for _, val := range intSlice {
+		n = packedIntSize(val)
+		if n > maxSize {
+			maxSize = n
+		}
+	}
+
+	for i := len(intSlice) - 1; i >= 0; i-- {
+		if totalSizeWritten > totalPackSize {
+			return fmt.Errorf("write overflow")
+		}
+		err := w.WritePackedUintIn(intSlice[i], maxSize)
+		if err != nil {
+			return err
+		}
+		totalSizeWritten += maxSize
+	}
+
+	elePackSize := packedIntSize(uint64(maxSize))
+	err := w.WritePackedUintIn(uint64(maxSize), elePackSize)
+	if err != nil {
+		return err
+	}
+
+	lenPackSize := packedIntSize(uint64(len(intSlice)))
+	err = w.WritePackedUintIn(uint64(len(intSlice)), lenPackSize)
+	if err != nil {
+		return err
+	}
+
+	x := encodePackSize(lenPackSize, elePackSize)
+	err = w.WriteByte(x)
+	if err != nil {
+		return err
+	}
+
+	// block1:
+	// n = packedIntSize(uint64(len(intSlice)))
+	// err := w.WritePackedUintIn(uint64(len(intSlice)), n)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// write a byte having the len(intSlice) i.e the number
+	// of elements in the intSlice and the sizesArrayPackSize.
+	// Also, do we write the packsize of len(intSlice) ie block1? or is
+	// len(intSlice) enough?
+	// x := encodePackSize(len(intSlice), sizesArrayPackSize)
+	// err := e.bw.WriteByte(x)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	log.Printf("writer says %v %v %v\n", maxSize, len(intSlice), intSlice)
+	return nil
+}
+
 func (w *writer) WritePackedOutput(v interface{}, n int) error {
-	val, ok := v.([]byte)
+	val, ok := v.([]uint64)
 	if ok {
-		//write byte slice
-		return w.WriteByteSlice(val, n)
+		//write int slice
+		return w.WriteIntSlice(val, n)
 	}
 	valInt, _ := v.(uint64)
 	return w.WritePackedUintIn(valInt, n)
 }
 
-func packedSize(in interface{}) int {
-	inBS, ok := in.([]byte)
-	if ok {
-		return len(inBS)
+func packedSliceSize(in []uint64) (rv int) {
+	maxSize := 0
+	for _, val := range in {
+		n := packedIntSize(val)
+		if n > maxSize {
+			maxSize = n
+		}
 	}
-	n, _ := in.(uint64)
+	rv += len(in) * maxSize
+
+	elePackSize := packedIntSize(uint64(maxSize))
+
+	lenPackSize := packedIntSize(uint64(len(in)))
+
+	return rv + elePackSize + lenPackSize + 1
+}
+
+func packedIntSize(n uint64) int {
 	if n < 1<<8 {
 		return 1
 	} else if n < 1<<16 {
@@ -122,4 +220,13 @@ func packedSize(in interface{}) int {
 		return 7
 	}
 	return 8
+}
+
+func packedSize(in interface{}) int {
+	intSlice, ok := in.([]uint64)
+	if ok {
+		return packedSliceSize(intSlice)
+	}
+	n, _ := in.(uint64)
+	return packedIntSize(n)
 }

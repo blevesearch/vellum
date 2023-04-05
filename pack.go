@@ -14,6 +14,8 @@
 
 package vellum
 
+import "log"
+
 func deltaAddr(base, trans uint64) uint64 {
 	// transition dest of 0 is special case
 	if trans == 0 {
@@ -52,4 +54,24 @@ func readPackedUint(data []byte) (rv uint64) {
 		rv |= shifted
 	}
 	return
+}
+
+func readPackedIntSlice(data []byte) (rv []uint64) {
+	if len(data) <= 1 {
+		return rv
+	}
+	i := len(data) - 1
+	lenPackSize, elePackSize := decodePackSize(data[i])
+	log.Printf("the values %v %v %v", lenPackSize, elePackSize, len(data))
+	n := readPackedUint(data[i-lenPackSize : i])
+	i -= lenPackSize
+	eleSize := int(readPackedUint(data[i-elePackSize : i]))
+	i -= elePackSize
+	for n > 0 {
+		rv = append(rv, readPackedUint(data[i-eleSize:i]))
+		i -= eleSize
+		n--
+	}
+
+	return rv
 }

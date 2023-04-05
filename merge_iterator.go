@@ -156,12 +156,17 @@ func (m *MergeIterator) Close() error {
 	return rv
 }
 
+// What's the logic with respect to choosing the max
+// and min vals. i.e. the following two funcs
+// Perhaps a logic involving sum of the elements
+// in vals[i]?
+
 // MergeMin chooses the minimum value
 func MergeMin(vals []interface{}) interface{} {
 	rvI := vals[0]
 	switch rvI.(type) {
-	case []byte:
-		return []byte{}
+	case []uint64:
+		return []uint64{}
 	}
 	rv, _ := rvI.(uint64)
 	for _, val := range vals[1:] {
@@ -177,8 +182,8 @@ func MergeMin(vals []interface{}) interface{} {
 func MergeMax(vals []interface{}) interface{} {
 	rvI := vals[0]
 	switch rvI.(type) {
-	case []byte:
-		return []byte{}
+	case []uint64:
+		return []uint64{}
 	}
 	rv, _ := rvI.(uint64)
 	for _, val := range vals[1:] {

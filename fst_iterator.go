@@ -203,6 +203,7 @@ OUTER:
 			// check to see if new keystack might have gone too far
 			if i.endKeyExclusive != nil &&
 				bytes.Compare(i.keysStack, i.endKeyExclusive) >= 0 {
+				log.Printf("key stack too far")
 				return ErrIteratorDone
 			}
 
@@ -240,7 +241,6 @@ OUTER:
 			// push onto stack
 			next, err := i.f.decoder.stateAt(nextAddr, nextPrealloc)
 			if err != nil {
-				log.Printf("error over here\n")
 				return err
 			}
 
@@ -286,7 +286,7 @@ OUTER:
 		i.valsStack = i.valsStack[:len(i.valsStack)-popNum]
 		i.autStatesStack = i.autStatesStack[:len(i.autStatesStack)-popNum]
 	}
-
+	log.Printf("its literally done")
 	return ErrIteratorDone
 }
 

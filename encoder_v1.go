@@ -54,8 +54,8 @@ func (e *encoderV1) reset(w io.Writer) {
 func (e *encoderV1) start() error {
 	header := make([]byte, headerSize)
 	binary.LittleEndian.PutUint64(header, versionV1)
-	if e.outputType&storeByteSlice > 0 {
-		binary.LittleEndian.PutUint64(header[8:], uint64(storeByteSlice)) // type
+	if e.outputType&storeIntSlice > 0 {
+		binary.LittleEndian.PutUint64(header[8:], uint64(storeIntSlice)) // type
 	} else {
 		binary.LittleEndian.PutUint64(header[8:], uint64(0))
 	}
@@ -72,11 +72,11 @@ func (e *encoderV1) start() error {
 
 func (e *encoderV1) isEmptyFinalOutput(s *builderNode) bool {
 	switch e.outputType {
-	case storeByteSlice:
-		val, _ := s.finalOutput.([]byte)
+	case storeIntSlice:
+		val, _ := s.finalOutput.([]uint64)
 		return len(val) == 0
 	default:
-		val, _ := s.finalOutput.(int)
+		val, _ := s.finalOutput.(uint64)
 		return val == 0
 	}
 }
@@ -138,8 +138,8 @@ func (e *encoderV1) encodeStateOneFinish(s *builderNode, next byte) (int, error)
 
 func (e *encoderV1) isTransOutEmpty(t *transition) bool {
 	switch e.outputType {
-	case storeByteSlice:
-		val, _ := t.out.([]byte)
+	case storeIntSlice:
+		val, _ := t.out.([]uint64)
 		return len(val) == 0
 	default:
 		val, _ := t.out.(uint64)
@@ -147,38 +147,80 @@ func (e *encoderV1) isTransOutEmpty(t *transition) bool {
 	}
 }
 
+// we could have something similar to how deltas are stored
+// to store the outsizes.
+
+// and then store the totalOutSizes as part of the packSize
+// below. totalOutSizes = sum of packSizes?
+
+// So format could look something like:
+//
+//							1 byte								    numTrans      numTrans * transPackSizes    numTrans * outSizesPackSize	        sum(outSizes[i])
+//	   <packSize(transPackSize/outSizesPackSize)>             <<trans keys>>        <<deltas>>                  <<!outSizes!>>                       <<outputs>>
 func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	transPackSize := 0
-	outPackSize := packedSize(s.finalOutput)
+	var outSizes []uint64
+	outPackSize := uint64(packedSize(s.finalOutput))
+	outSizesPackSize := packedSize(outPackSize)
 	anyOutputs := !e.isEmptyFinalOutput(s)
+
+	// We find the max transPackSize and the outPackSize
+	// using which we encode each transition's output.
+	// But when it comes storing int slice, we would
+	// end up padding all the empty spaces and cause
+	// redundant disk use
 	for i := range s.trans {
+		// having fixed transSize is fine I think?
 		delta := deltaAddr(start, uint64(s.trans[i].addr))
 		tsize := packedSize(delta)
 		if tsize > transPackSize {
 			transPackSize = tsize
 		}
-		osize := packedSize(s.trans[i].out)
-		if osize > outPackSize {
-			outPackSize = osize
+		// this could different per out to save space.
+		// so maintain an array of it.
+		// however we can pack a max size within this
+		// array of outSizes
+		osize := uint64(packedSize(s.trans[i].out))
+		outSizes = append(outSizes, osize)
+		packosize := packedSize(osize)
+		if packosize > outSizesPackSize {
+			outSizesPackSize = packosize
 		}
 		anyOutputs = anyOutputs || !e.isTransOutEmpty(&s.trans[i])
 	}
+
+	if s.final {
+		outSizes = append(outSizes, outPackSize)
+	}
+
 	if !anyOutputs {
-		outPackSize = 0
+		outSizesPackSize = 0
 	}
 
 	if anyOutputs {
 		// output final value
 		if s.final {
-			err := e.bw.WritePackedOutput(s.finalOutput, outPackSize)
+			err := e.bw.WritePackedOutput(s.finalOutput, int(outSizes[len(outSizes)-1]))
 			if err != nil {
 				return 0, err
 			}
 		}
 		// output transition values (in reverse)
 		for j := len(s.trans) - 1; j >= 0; j-- {
-			err := e.bw.WritePackedOutput(s.trans[j].out, outPackSize)
+			packSize := int(outSizes[j])
+			// could end up being something like outSize[i] or something?
+			err := e.bw.WritePackedOutput(s.trans[j].out, packSize)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	// write the outSizes, corresponding to each output
+	if e.outputType == storeIntSlice {
+		for j := len(outSizes) - 1; j >= 0; j-- {
+			err := e.bw.WritePackedUintIn(outSizes[j], outSizesPackSize)
 			if err != nil {
 				return 0, err
 			}
@@ -193,7 +235,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 			return 0, err
 		}
 	}
-	// why is there no commoninput transformation here?
+
 	// output transition keys (in reverse)
 	for j := len(s.trans) - 1; j >= 0; j-- {
 		err := e.bw.WriteByte(s.trans[j].in)
@@ -202,7 +244,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 		}
 	}
 
-	packSize := encodePackSize(transPackSize, outPackSize)
+	packSize := encodePackSize(transPackSize, outSizesPackSize)
 	err := e.bw.WriteByte(packSize)
 	if err != nil {
 		return 0, err

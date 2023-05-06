@@ -67,6 +67,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransChar: 'a',
 				singleTransNext: true,
 				singleTransAddr: 15,
+				singleTransOut:  uint64(0),
 			},
 		},
 		{
@@ -87,6 +88,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransChar: 0xff,
 				singleTransNext: true,
 				singleTransAddr: 15,
+				singleTransOut:  uint64(0),
 			},
 		},
 		{
@@ -109,6 +111,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransNext: false,
 				singleTransAddr: 12,
 				transSize:       1,
+				singleTransOut:  uint64(0),
 			},
 		},
 		{
@@ -132,6 +135,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransNext: false,
 				singleTransAddr: 12,
 				transSize:       1,
+				singleTransOut:  uint64(0),
 			},
 		},
 		{
@@ -154,7 +158,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransChar: 'a',
 				singleTransNext: false,
 				singleTransAddr: 12,
-				singleTransOut:  27,
+				singleTransOut:  uint64(27),
 				transSize:       1,
 				outSize:         1,
 			},
@@ -180,7 +184,7 @@ func TestDecoderStateAt(t *testing.T) {
 				singleTransChar: 0xff,
 				singleTransNext: false,
 				singleTransAddr: 12,
-				singleTransOut:  39,
+				singleTransOut:  uint64(39),
 				transSize:       1,
 				outSize:         1,
 			},
@@ -403,7 +407,7 @@ func TestFSTStateFinalOutput(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			got := test.in.FinalOutput()
 			if got != test.want {
-				t.Errorf("wanted: %d, got: %d", test.want, got)
+				t.Errorf("wanted: %v, got: %v", test.want, got)
 			}
 		})
 	}

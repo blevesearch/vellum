@@ -25,7 +25,7 @@ type Iterator interface {
 	// The []byte of the key is ONLY guaranteed to be valid until
 	// another call to Next/Seek/Close.  If you need it beyond that
 	// point you MUST make a copy.
-	Current() ([]byte, uint64)
+	Current() ([]byte, interface{})
 
 	// Next() advances the iterator to the next key/value pair.
 	// If no more key/value pairs exist, ErrIteratorDone is returned.
@@ -57,7 +57,7 @@ type FSTIterator struct {
 	statesStack    []fstState
 	keysStack      []byte
 	keysPosStack   []int
-	valsStack      []uint64
+	valsStack      []interface{}
 	autStatesStack []int
 
 	nextStart []byte
@@ -165,14 +165,14 @@ func (i *FSTIterator) pointTo(key []byte) error {
 // Current returns the key and value currently pointed to by the iterator.
 // If the iterator is not pointing at a valid value (because Iterator/Next/Seek)
 // returned an error previously, it may return nil,0.
-func (i *FSTIterator) Current() ([]byte, uint64) {
+func (i *FSTIterator) Current() ([]byte, interface{}) {
 	curr := i.statesStack[len(i.statesStack)-1]
 	if curr.Final() {
-		var total uint64
+		var total interface{}
 		for _, v := range i.valsStack {
-			total += v
+			total = cumulateOutput(total, v)
 		}
-		total += curr.FinalOutput()
+		total = cumulateOutput(total, curr.FinalOutput())
 		return i.keysStack, total
 	}
 	return nil, 0

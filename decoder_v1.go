@@ -28,12 +28,14 @@ func init() {
 }
 
 type decoderV1 struct {
-	data []byte
+	data    []byte
+	outType int
 }
 
 func newDecoderV1(data []byte) *decoderV1 {
 	return &decoderV1{
-		data: data,
+		data:    data,
+		outType: int(binary.LittleEndian.Uint64(data[8:])),
 	}
 }
 
@@ -62,6 +64,7 @@ func (d *decoderV1) stateAt(addr int, prealloc fstState) (fstState, error) {
 	} else {
 		state = &fstStateV1{}
 	}
+	state.outType = d.outType
 	err := state.at(d.data, addr)
 	if err != nil {
 		return nil, err
@@ -74,12 +77,13 @@ type fstStateV1 struct {
 	top      int
 	bottom   int
 	numTrans int
+	outType  int
 
 	// single trans only
 	singleTransChar byte
 	singleTransNext bool
 	singleTransAddr uint64
-	singleTransOut  uint64
+	singleTransOut  interface{}
 
 	// shared
 	transSize int
@@ -139,6 +143,13 @@ func (f *fstStateV1) atNone() error {
 	return nil
 }
 
+func (f *fstStateV1) zeroOutput() interface{} {
+	switch f.outType {
+	default:
+		return uint64(0)
+	}
+}
+
 func (f *fstStateV1) atSingle(data []byte, addr int) error {
 	// handle single transition case
 	f.numTrans = 1
@@ -153,7 +164,7 @@ func (f *fstStateV1) atSingle(data []byte, addr int) error {
 	if f.singleTransNext {
 		// now we know the bottom, can compute next addr
 		f.singleTransAddr = uint64(f.bottom - 1)
-		f.singleTransOut = 0
+		f.singleTransOut = f.zeroOutput()
 	} else {
 		f.bottom-- // extra byte with pack sizes
 		f.transSize, f.outSize = decodePackSize(data[f.bottom])
@@ -163,7 +174,7 @@ func (f *fstStateV1) atSingle(data []byte, addr int) error {
 			f.bottom -= f.outSize // exactly one out (could be length 0 though)
 			f.singleTransOut = readPackedUint(data[f.bottom : f.bottom+f.outSize])
 		} else {
-			f.singleTransOut = 0
+			f.singleTransOut = f.zeroOutput()
 		}
 		// need to wait till we know bottom
 		if f.singleTransAddr != 0 {
@@ -216,11 +227,11 @@ func (f *fstStateV1) Final() bool {
 	return f.final
 }
 
-func (f *fstStateV1) FinalOutput() uint64 {
+func (f *fstStateV1) FinalOutput() interface{} {
 	if f.final && f.outSize > 0 {
 		return readPackedUint(f.data[f.outFinal : f.outFinal+f.outSize])
 	}
-	return 0
+	return f.zeroOutput()
 }
 
 func (f *fstStateV1) NumTransitions() int {
@@ -235,7 +246,7 @@ func (f *fstStateV1) TransitionAt(i int) byte {
 	return transitionKeys[f.numTrans-i-1]
 }
 
-func (f *fstStateV1) TransitionFor(b byte) (int, int, uint64) {
+func (f *fstStateV1) TransitionFor(b byte) (int, int, interface{}) {
 	if f.isEncodedSingle() {
 		if f.singleTransChar == b {
 			return 0, int(f.singleTransAddr), f.singleTransOut
@@ -254,7 +265,7 @@ func (f *fstStateV1) TransitionFor(b byte) (int, int, uint64) {
 		dest = f.bottom - dest
 	}
 	transVals := f.data[f.outBottom:f.outTop]
-	var out uint64
+	var out interface{}
 	if f.outSize > 0 {
 		out = readPackedUint(transVals[pos*f.outSize : pos*f.outSize+f.outSize])
 	}

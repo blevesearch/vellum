@@ -32,7 +32,6 @@ Once the FST is ready, you can use the Contains() method to see if a keys is
 in the FST.  You can use the Get() method to see if a key is in the FST and
 retrieve it's associated value.  And, you can use the Iterator method to
 enumerate key/value pairs within a specified range.
-
 */
 package vellum
 
@@ -57,6 +56,7 @@ type BuilderOpts struct {
 	Encoder           int
 	RegistryTableSize int
 	RegistryMRUSize   int
+	outType           int
 }
 
 // New returns a new Builder which will stream out the

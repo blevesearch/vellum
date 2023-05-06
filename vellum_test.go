@@ -69,7 +69,7 @@ func TestRoundTripSimple(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -122,11 +122,11 @@ func TestRoundTripSimple(t *testing.T) {
 
 	// now try accessing it through the Transducer interface
 	var val uint64
-	exists, val = TransducerGet(fst, []byte("mon"))
+	exists, _val := TransducerGet(fst, []byte("mon"))
 	if !exists {
 		t.Errorf("expected key 'mon' to exist, doesn't")
 	}
-	if val != 2 {
+	if _val.(uint64) != 2 {
 		t.Errorf("expected val 2, got %d", val)
 	}
 
@@ -197,7 +197,7 @@ func TestRoundTripThousand(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -269,7 +269,7 @@ func TestRoundTripEmpty(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -334,7 +334,7 @@ func TestRoundTripEmptyString(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -404,7 +404,7 @@ func TestRoundTripEmptyStringAndOthers(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -569,7 +569,7 @@ func TestMerge(t *testing.T) {
 	itrc, err := fstc.Iterator(nil, nil)
 	for err == nil {
 		key, val := itrc.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itrc.Next()
 	}
 	if err != ErrIteratorDone {

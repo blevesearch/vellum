@@ -80,8 +80,8 @@ func decodeHeader(header []byte) (ver int, typ int, err error) {
 type fstState interface {
 	Address() int
 	Final() bool
-	FinalOutput() uint64
+	FinalOutput() interface{}
 	NumTransitions() int
-	TransitionFor(b byte) (int, int, uint64)
+	TransitionFor(b byte) (int, int, interface{})
 	TransitionAt(i int) byte
 }

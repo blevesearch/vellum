@@ -56,6 +56,17 @@ func (w *writer) Flush() error {
 	return w.w.Flush()
 }
 
+func (w *writer) WritePackedOutput(v interface{}, n int) error {
+	valInt, ok := v.(uint64)
+	if !ok {
+		v1, ok := v.(int)
+		if ok {
+			valInt = uint64(v1)
+		}
+	}
+	return w.WritePackedUintIn(valInt, n)
+}
+
 func (w *writer) WritePackedUintIn(v uint64, n int) error {
 	for shift := uint(0); shift < uint(n*8); shift += 8 {
 		err := w.WriteByte(byte(v >> shift))
@@ -72,7 +83,7 @@ func (w *writer) WritePackedUint(v uint64) error {
 	return w.WritePackedUintIn(v, n)
 }
 
-func packedSize(n uint64) int {
+func packedIntSize(n uint64) int {
 	if n < 1<<8 {
 		return 1
 	} else if n < 1<<16 {
@@ -89,4 +100,9 @@ func packedSize(n uint64) int {
 		return 7
 	}
 	return 8
+}
+
+func packedSize(in interface{}) int {
+	n, _ := in.(uint64)
+	return packedIntSize(n)
 }

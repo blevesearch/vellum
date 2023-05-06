@@ -63,12 +63,18 @@ func (f *FST) Contains(val []byte) (bool, error) {
 // Get returns the value associated with the key.  NOTE: a value of zero
 // does not imply the key does not exist, you must consult the second
 // return value as well.
-func (f *FST) Get(input []byte) (uint64, bool, error) {
+func (f *FST) Get(input []byte) (interface{}, bool, error) {
 	return f.get(input, nil)
 }
 
-func (f *FST) get(input []byte, prealloc fstState) (uint64, bool, error) {
-	var total uint64
+func cumulateOutput(total interface{}, output interface{}) interface{} {
+	totalInt, _ := total.(uint64)
+	outInt, _ := output.(uint64)
+	return totalInt + outInt
+}
+
+func (f *FST) get(input []byte, prealloc fstState) (interface{}, bool, error) {
+	var total interface{}
 	curr := f.decoder.getRoot()
 	state, err := f.decoder.stateAt(curr, prealloc)
 	if err != nil {
@@ -85,11 +91,11 @@ func (f *FST) get(input []byte, prealloc fstState) (uint64, bool, error) {
 			return 0, false, err
 		}
 
-		total += output
+		total = cumulateOutput(total, output)
 	}
 
 	if state.Final() {
-		total += state.FinalOutput()
+		total = cumulateOutput(total, state.FinalOutput())
 		return total, true, nil
 	}
 	return 0, false, nil
@@ -159,7 +165,7 @@ func (f *FST) Accept(addr int, b byte) int {
 
 // IsMatchWithVal returns if this state is a matching state in this Automaton
 // and also returns the final output value for this state
-func (f *FST) IsMatchWithVal(addr int) (bool, uint64) {
+func (f *FST) IsMatchWithVal(addr int) (bool, interface{}) {
 	s, err := f.decoder.stateAt(addr, nil)
 	if err != nil {
 		return false, 0
@@ -169,7 +175,7 @@ func (f *FST) IsMatchWithVal(addr int) (bool, uint64) {
 
 // AcceptWithVal returns the next state for this Automaton on input of byte b
 // and also returns the output value for the transition
-func (f *FST) AcceptWithVal(addr int, b byte) (int, uint64) {
+func (f *FST) AcceptWithVal(addr int, b byte) (int, interface{}) {
 	s, err := f.decoder.stateAt(addr, nil)
 	if err != nil {
 		return noneAddr, 0
@@ -295,6 +301,6 @@ type Reader struct {
 	prealloc fstStateV1
 }
 
-func (r *Reader) Get(input []byte) (uint64, bool, error) {
+func (r *Reader) Get(input []byte) (interface{}, bool, error) {
 	return r.f.get(input, &r.prealloc)
 }

@@ -58,6 +58,23 @@ func (r *registry) entry(node *builderNode) (bool, int, *registryCell) {
 
 const fnvPrime = 1099511628211
 
+func hashOutput(out interface{}, typ int) uint64 {
+	var hash uint64
+	switch typ {
+	default:
+		val, ok := out.(uint64)
+		if !ok {
+			val1, ok := out.(int)
+			if ok {
+				hash = uint64(val1)
+				return hash
+			}
+		}
+		hash = val
+	}
+	return hash
+}
+
 func (r *registry) hash(b *builderNode) int {
 	var final uint64
 	if b.final {
@@ -66,10 +83,10 @@ func (r *registry) hash(b *builderNode) int {
 
 	var h uint64 = 14695981039346656037
 	h = (h ^ final) * fnvPrime
-	h = (h ^ b.finalOutput) * fnvPrime
+	h = (h ^ hashOutput(b.finalOutput, b.outType)) * fnvPrime
 	for _, t := range b.trans {
 		h = (h ^ uint64(t.in)) * fnvPrime
-		h = (h ^ t.out) * fnvPrime
+		h = (h ^ hashOutput(t.out, b.outType)) * fnvPrime
 		h = (h ^ uint64(t.addr)) * fnvPrime
 	}
 	return int(h % uint64(r.tableSize))

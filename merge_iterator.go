@@ -23,7 +23,7 @@ import (
 // Values presented to the MergeFunc will be in the same order as the
 // original slice creating the MergeIterator.  This allows some MergeFunc
 // implementations to prioritize one iterator over another.
-type MergeFunc func([]uint64) uint64
+type MergeFunc func([]interface{}) interface{}
 
 // MergeIterator implements the Iterator interface by traversing a slice
 // of iterators and merging the contents of them.  If the same key exists
@@ -33,13 +33,13 @@ type MergeIterator struct {
 	itrs   []Iterator
 	f      MergeFunc
 	currKs [][]byte
-	currVs []uint64
+	currVs []interface{}
 
 	lowK    []byte
-	lowV    uint64
+	lowV    interface{}
 	lowIdxs []int
 
-	mergeV []uint64
+	mergeV []interface{}
 }
 
 // NewMergeIterator creates a new MergeIterator over the provided slice of
@@ -49,9 +49,9 @@ func NewMergeIterator(itrs []Iterator, f MergeFunc) (*MergeIterator, error) {
 		itrs:    itrs,
 		f:       f,
 		currKs:  make([][]byte, len(itrs)),
-		currVs:  make([]uint64, len(itrs)),
+		currVs:  make([]interface{}, len(itrs)),
 		lowIdxs: make([]int, 0, len(itrs)),
-		mergeV:  make([]uint64, 0, len(itrs)),
+		mergeV:  make([]interface{}, 0, len(itrs)),
 	}
 	rv.init()
 	if rv.lowK == nil {
@@ -103,7 +103,7 @@ func (m *MergeIterator) updateMatches() {
 // Current returns the key and value currently pointed to by this iterator.
 // If the iterator is not pointing at a valid value (because Iterator/Next/Seek)
 // returned an error previously, it may return nil,0.
-func (m *MergeIterator) Current() ([]byte, uint64) {
+func (m *MergeIterator) Current() ([]byte, interface{}) {
 	return m.lowK, m.lowV
 }
 
@@ -157,9 +157,10 @@ func (m *MergeIterator) Close() error {
 }
 
 // MergeMin chooses the minimum value
-func MergeMin(vals []uint64) uint64 {
-	rv := vals[0]
-	for _, v := range vals[1:] {
+func MergeMin(vals []interface{}) interface{} {
+	rv, _ := vals[0].(uint64)
+	for _, val := range vals[1:] {
+		v, _ := val.(uint64)
 		if v < rv {
 			rv = v
 		}
@@ -168,9 +169,10 @@ func MergeMin(vals []uint64) uint64 {
 }
 
 // MergeMax chooses the maximum value
-func MergeMax(vals []uint64) uint64 {
-	rv := vals[0]
-	for _, v := range vals[1:] {
+func MergeMax(vals []interface{}) interface{} {
+	rv, _ := vals[0].(uint64)
+	for _, val := range vals[1:] {
+		v, _ := val.(uint64)
 		if v > rv {
 			rv = v
 		}
@@ -179,9 +181,10 @@ func MergeMax(vals []uint64) uint64 {
 }
 
 // MergeSum sums the values
-func MergeSum(vals []uint64) uint64 {
-	rv := vals[0]
-	for _, v := range vals[1:] {
+func MergeSum(vals []interface{}) interface{} {
+	rv, _ := vals[0].(uint64)
+	for _, val := range vals[1:] {
+		v, _ := val.(uint64)
 		rv += v
 	}
 	return rv

@@ -49,7 +49,7 @@ func TestIterator(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -118,7 +118,7 @@ func TestIteratorReset(t *testing.T) {
 	err = itr.Reset(fst, nil, nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -157,7 +157,7 @@ func TestIteratorStartKey(t *testing.T) {
 	itr, err := fst.Iterator([]byte("a"), nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -172,7 +172,7 @@ func TestIteratorStartKey(t *testing.T) {
 	itr, err = fst.Iterator([]byte("mon"), nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -192,7 +192,7 @@ func TestIteratorStartKey(t *testing.T) {
 	itr, err = fst.Iterator([]byte("mona"), nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -212,7 +212,7 @@ func TestIteratorStartKey(t *testing.T) {
 	itr, err = fst.Iterator([]byte("my"), nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -250,7 +250,7 @@ func TestIteratorEndKey(t *testing.T) {
 	itr, err := fst.Iterator(nil, []byte("zeus"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -270,7 +270,7 @@ func TestIteratorEndKey(t *testing.T) {
 	itr, err = fst.Iterator(nil, []byte("tye"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -285,7 +285,7 @@ func TestIteratorEndKey(t *testing.T) {
 	itr, err = fst.Iterator(nil, []byte("tv"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -328,7 +328,7 @@ func TestIteratorSeek(t *testing.T) {
 	itr, err := fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 
 		if string(key) == "mon" {
 			err = itr.Seek([]byte("tue"))
@@ -348,7 +348,7 @@ func TestIteratorSeek(t *testing.T) {
 	itr, err = fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 
 		if string(key) == "mon" {
 			err = itr.Seek([]byte("thv"))
@@ -368,7 +368,7 @@ func TestIteratorSeek(t *testing.T) {
 	itr, err = fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 
 		if string(key) == "mon" {
 			err = itr.Seek([]byte("thursday"))
@@ -391,7 +391,7 @@ func TestIteratorSeek(t *testing.T) {
 	itr, err = fst.Iterator(nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 
 		if string(key) == "mon" {
 			err = itr.Seek([]byte("zzz"))
@@ -438,7 +438,7 @@ func TestIteratorSeekOutsideBoundaries(t *testing.T) {
 	itr, err := fst.Iterator([]byte("th"), []byte("tuesd"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -458,7 +458,7 @@ func TestIteratorSeekOutsideBoundaries(t *testing.T) {
 	err = itr.Seek([]byte("cat"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -482,7 +482,7 @@ func TestIteratorSeekOutsideBoundaries(t *testing.T) {
 }
 
 var key []byte
-var val uint64
+var val interface{}
 
 func BenchmarkFSTIteratorAllInMem(b *testing.B) {
 	// first build the FST once
@@ -568,7 +568,7 @@ func TestFuzzySearch(t *testing.T) {
 	itr, err := fst.Search(fuzzy, nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -615,7 +615,7 @@ func TestRegexpSearch(t *testing.T) {
 	itr, err := fst.Search(r, nil, nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -629,7 +629,7 @@ func TestRegexpSearch(t *testing.T) {
 	itr, err = fst.Search(r, []byte("t"), nil)
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -643,7 +643,7 @@ func TestRegexpSearch(t *testing.T) {
 	itr, err = fst.Search(r, nil, []byte("u"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {
@@ -657,7 +657,7 @@ func TestRegexpSearch(t *testing.T) {
 	itr, err = fst.Search(r, []byte("t"), []byte("u"))
 	for err == nil {
 		key, val := itr.Current()
-		got[string(key)] = val
+		got[string(key)] = val.(uint64)
 		err = itr.Next()
 	}
 	if err != ErrIteratorDone {

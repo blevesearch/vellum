@@ -42,7 +42,7 @@ func TestMergeIterator(t *testing.T) {
 					"f": 6,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
+			merge: func(mvs []interface{}) interface{} {
 				return mvs[0]
 			},
 			want: map[string]uint64{
@@ -68,10 +68,10 @@ func TestMergeIterator(t *testing.T) {
 					"e": 6,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
+			merge: func(mvs []interface{}) interface{} {
 				var rv uint64
 				for _, mv := range mvs {
-					rv += mv
+					rv += mv.(uint64)
 				}
 				return rv
 			},
@@ -98,7 +98,7 @@ func TestMergeIterator(t *testing.T) {
 					"tank": 0,
 				},
 			},
-			merge: func(mvs []uint64) uint64 {
+			merge: func(mvs []interface{}) interface{} {
 				return mvs[0]
 			},
 			want: map[string]uint64{
@@ -134,7 +134,7 @@ func TestMergeIterator(t *testing.T) {
 			for err == nil {
 				currk, currv := mi.Current()
 				err = mi.Next()
-				got[string(currk)] = currv
+				got[string(currk)] = currv.(uint64)
 			}
 			if err != nil && err != ErrIteratorDone {
 				t.Fatalf("error iterating: %v", err)
@@ -167,7 +167,7 @@ func newTestIterator(in map[string]uint64) (*testIterator, error) {
 	return rv, nil
 }
 
-func (m *testIterator) Current() ([]byte, uint64) {
+func (m *testIterator) Current() ([]byte, interface{}) {
 	if m.curr >= len(m.keys) {
 		return nil, 0
 	}
@@ -229,11 +229,20 @@ func TestMergeFunc(t *testing.T) {
 		},
 	}
 
+	getInput := func(in []uint64) []interface{} {
+		rv := make([]interface{}, len(in))
+		for i := 0; i < len(in); i++ {
+			rv[i] = in[i]
+		}
+		return rv
+	}
+
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got := test.merge(test.in)
+			inp := getInput(test.in)
+			got := test.merge(inp)
 			if test.want != got {
-				t.Errorf("expected %d, got %d", test.want, got)
+				t.Errorf("expected %v, got %v", test.want, got)
 			}
 		})
 	}
@@ -255,8 +264,8 @@ func TestEmptyMergeIterator(t *testing.T) {
 	if ck != nil {
 		t.Errorf("expected current to return nil key, got %v", ck)
 	}
-	if cv != 0 {
-		t.Errorf("expected current to return 0 val, got %d", cv)
+	if cv != nil {
+		t.Errorf("expected current to return nil val, got %d", cv)
 	}
 
 	// calling Next/Seek continues to return ErrIteratorDone

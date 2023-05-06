@@ -33,7 +33,8 @@ func init() {
 }
 
 type encoderV1 struct {
-	bw *writer
+	bw      *writer
+	outType int
 }
 
 func newEncoderV1(w io.Writer) *encoderV1 {
@@ -60,12 +61,30 @@ func (e *encoderV1) start() error {
 	return nil
 }
 
+func (e *encoderV1) setOutputType(typ int) {
+	e.outType = typ
+}
+
+func (e *encoderV1) isEmptyFinalOutput(s *builderNode) bool {
+	switch e.outType {
+	default:
+		val, ok := s.finalOutput.(uint64)
+		if !ok {
+			val1, ok := s.finalOutput.(int)
+			if ok {
+				return val1 == 0
+			}
+		}
+		return val == 0
+	}
+}
+
 func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
-	if len(s.trans) == 0 && s.final && s.finalOutput == 0 {
+	if len(s.trans) == 0 && s.final && e.isEmptyFinalOutput(s) {
 		return 0, nil
 	} else if len(s.trans) != 1 || s.final {
 		return e.encodeStateMany(s)
-	} else if !s.final && s.trans[0].out == 0 && s.trans[0].addr == lastAddr {
+	} else if !s.final && e.isTransOutEmpty(&s.trans[0]) && s.trans[0].addr == lastAddr {
 		return e.encodeStateOneFinish(s, transitionNext)
 	}
 	return e.encodeStateOne(s)
@@ -74,9 +93,9 @@ func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
 func (e *encoderV1) encodeStateOne(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	outPackSize := 0
-	if s.trans[0].out != 0 {
+	if !e.isTransOutEmpty(&s.trans[0]) {
 		outPackSize = packedSize(s.trans[0].out)
-		err := e.bw.WritePackedUintIn(s.trans[0].out, outPackSize)
+		err := e.bw.WritePackedOutput(s.trans[0].out, outPackSize)
 		if err != nil {
 			return 0, err
 		}
@@ -115,11 +134,25 @@ func (e *encoderV1) encodeStateOneFinish(s *builderNode, next byte) (int, error)
 	return e.bw.counter - 1, nil
 }
 
+func (e *encoderV1) isTransOutEmpty(t *transition) bool {
+	switch e.outType {
+	default:
+		val, ok := t.out.(uint64)
+		if !ok {
+			val1, ok := t.out.(int)
+			if ok {
+				return val1 == 0
+			}
+		}
+		return val == 0
+	}
+}
+
 func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	transPackSize := 0
 	outPackSize := packedSize(s.finalOutput)
-	anyOutputs := s.finalOutput != 0
+	anyOutputs := !e.isEmptyFinalOutput(s)
 	for i := range s.trans {
 		delta := deltaAddr(start, uint64(s.trans[i].addr))
 		tsize := packedSize(delta)
@@ -130,7 +163,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 		if osize > outPackSize {
 			outPackSize = osize
 		}
-		anyOutputs = anyOutputs || s.trans[i].out != 0
+		anyOutputs = anyOutputs || !e.isTransOutEmpty(&s.trans[i])
 	}
 	if !anyOutputs {
 		outPackSize = 0
@@ -139,14 +172,14 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	if anyOutputs {
 		// output final value
 		if s.final {
-			err := e.bw.WritePackedUintIn(s.finalOutput, outPackSize)
+			err := e.bw.WritePackedOutput(s.finalOutput, outPackSize)
 			if err != nil {
 				return 0, err
 			}
 		}
 		// output transition values (in reverse)
 		for j := len(s.trans) - 1; j >= 0; j-- {
-			err := e.bw.WritePackedUintIn(s.trans[j].out, outPackSize)
+			err := e.bw.WritePackedOutput(s.trans[j].out, outPackSize)
 			if err != nil {
 				return 0, err
 			}

@@ -165,11 +165,11 @@ func TestBuilderNodeEquiv(t *testing.T) {
 			"both states final, different final val",
 			&builderNode{
 				final:       true,
-				finalOutput: uint64(7),
+				finalOutput: 7,
 			},
 			&builderNode{
 				final:       true,
-				finalOutput: uint64(9),
+				finalOutput: 9,
 			},
 			false,
 		},
@@ -178,13 +178,13 @@ func TestBuilderNodeEquiv(t *testing.T) {
 			&builderNode{
 				final: true,
 				trans: []transition{
-					{in: 'a', out: uint64(7)},
+					{in: 'a', out: 7},
 				},
 			},
 			&builderNode{
 				final: true,
 				trans: []transition{
-					{in: 'a', out: uint64(9)},
+					{in: 'a', out: 9},
 				},
 			},
 			false,

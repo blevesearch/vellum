@@ -61,26 +61,8 @@ func (e *encoderV1) start() error {
 	return nil
 }
 
-func (e *encoderV1) setOutputType(typ int) {
-	e.outType = typ
-}
-
-func (e *encoderV1) isEmptyFinalOutput(s *builderNode) bool {
-	switch e.outType {
-	default:
-		val, ok := s.finalOutput.(uint64)
-		if !ok {
-			val1, ok := s.finalOutput.(int)
-			if ok {
-				return val1 == 0
-			}
-		}
-		return val == 0
-	}
-}
-
 func (e *encoderV1) encodeState(s *builderNode, lastAddr int) (int, error) {
-	if len(s.trans) == 0 && s.final && e.isEmptyFinalOutput(s) {
+	if len(s.trans) == 0 && s.final && isEmptyOutput(e.outType, s.finalOutput) {
 		return 0, nil
 	} else if len(s.trans) != 1 || s.final {
 		return e.encodeStateMany(s)
@@ -152,7 +134,7 @@ func (e *encoderV1) encodeStateMany(s *builderNode) (int, error) {
 	start := uint64(e.bw.counter)
 	transPackSize := 0
 	outPackSize := packedSize(s.finalOutput)
-	anyOutputs := !e.isEmptyFinalOutput(s)
+	anyOutputs := !isEmptyOutput(e.outType, s.finalOutput)
 	for i := range s.trans {
 		delta := deltaAddr(start, uint64(s.trans[i].addr))
 		tsize := packedSize(delta)

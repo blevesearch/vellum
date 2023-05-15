@@ -143,13 +143,6 @@ func (f *fstStateV1) atNone() error {
 	return nil
 }
 
-func (f *fstStateV1) zeroOutput() interface{} {
-	switch f.outType {
-	default:
-		return uint64(0)
-	}
-}
-
 func (f *fstStateV1) atSingle(data []byte, addr int) error {
 	// handle single transition case
 	f.numTrans = 1
@@ -164,7 +157,7 @@ func (f *fstStateV1) atSingle(data []byte, addr int) error {
 	if f.singleTransNext {
 		// now we know the bottom, can compute next addr
 		f.singleTransAddr = uint64(f.bottom - 1)
-		f.singleTransOut = f.zeroOutput()
+		f.singleTransOut = zeroOutput(f.outType)
 	} else {
 		f.bottom-- // extra byte with pack sizes
 		f.transSize, f.outSize = decodePackSize(data[f.bottom])
@@ -174,7 +167,7 @@ func (f *fstStateV1) atSingle(data []byte, addr int) error {
 			f.bottom -= f.outSize // exactly one out (could be length 0 though)
 			f.singleTransOut = readPackedUint(data[f.bottom : f.bottom+f.outSize])
 		} else {
-			f.singleTransOut = f.zeroOutput()
+			f.singleTransOut = zeroOutput(f.outType)
 		}
 		// need to wait till we know bottom
 		if f.singleTransAddr != 0 {
@@ -231,7 +224,7 @@ func (f *fstStateV1) FinalOutput() interface{} {
 	if f.final && f.outSize > 0 {
 		return readPackedUint(f.data[f.outFinal : f.outFinal+f.outSize])
 	}
-	return f.zeroOutput()
+	return zeroOutput(f.outType)
 }
 
 func (f *fstStateV1) NumTransitions() int {

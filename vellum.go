@@ -44,6 +44,10 @@ import (
 // lexicographic order.
 var ErrOutOfOrder = errors.New("values not inserted in lexicographic order")
 
+// ErrUnexpectedType is returned when values are not of the same data
+// type
+var ErrUnexpectedType = errors.New("values not of the same type")
+
 // ErrIteratorDone is returned by Iterator/Next/Seek methods when the
 // Current() value pointed to by the iterator is greater than the last
 // key in this FST, or outside the configured startKeyInclusive/endKeyExclusive

@@ -219,7 +219,7 @@ func TestEncoderStateOneNotNextWithCommonInputWithValue(t *testing.T) {
 			{
 				in:   'a',
 				addr: 32,
-				out:  uint64(27),
+				out:  27,
 			},
 		},
 	}
@@ -262,7 +262,7 @@ func TestEncoderStateOneNotNextWithUncommonInputWithValue(t *testing.T) {
 			{
 				in:   0xff,
 				addr: 32,
-				out:  uint64(39),
+				out:  39,
 			},
 		},
 	}
@@ -360,17 +360,17 @@ func TestEncoderStateManyWithValues(t *testing.T) {
 			{
 				in:   'a',
 				addr: 32,
-				out:  uint64(3),
+				out:  3,
 			},
 			{
 				in:   'b',
 				addr: 45,
-				out:  uint64(0),
+				out:  0,
 			},
 			{
 				in:   'c',
 				addr: 52,
-				out:  uint64(7),
+				out:  7,
 			},
 		},
 	}

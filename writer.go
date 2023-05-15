@@ -57,13 +57,7 @@ func (w *writer) Flush() error {
 }
 
 func (w *writer) WritePackedOutput(v interface{}, n int) error {
-	valInt, ok := v.(uint64)
-	if !ok {
-		v1, ok := v.(int)
-		if ok {
-			valInt = uint64(v1)
-		}
-	}
+	valInt, _, _ := getIntVals(v, nil)
 	return w.WritePackedUintIn(valInt, n)
 }
 

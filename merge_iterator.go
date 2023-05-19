@@ -156,17 +156,49 @@ func (m *MergeIterator) Close() error {
 	return rv
 }
 
-// What's the logic with respect to choosing the max
-// and min vals. i.e. the following two funcs
-// Perhaps a logic involving sum of the elements
-// in vals[i]?
+// java's array hashcode logic. is this is a good idea?
+func hashIntSlice(val []uint64) uint64 {
+	rv := uint64(1)
+	for _, v := range val {
+		rv = 31*rv + v
+	}
+	return rv
+}
+
+func getMinUint64Slice(vals []interface{}) []uint64 {
+	var rv []uint64
+	var minHash uint64 = ^uint64(0)
+	for _, val := range vals {
+		v, _ := val.([]uint64)
+		valHash := hashIntSlice(v)
+		if rv == nil || valHash < minHash {
+			minHash = valHash
+			rv = v
+		}
+	}
+	return rv
+}
+
+func getMaxUint64Slice(vals []interface{}) []uint64 {
+	var rv []uint64
+	var maxHash uint64 = 0
+	for _, val := range vals {
+		v, _ := val.([]uint64)
+		valHash := hashIntSlice(v)
+		if rv == nil || valHash > maxHash {
+			maxHash = valHash
+			rv = v
+		}
+	}
+	return rv
+}
 
 // MergeMin chooses the minimum value
 func MergeMin(vals []interface{}) interface{} {
 	rvI := vals[0]
 	switch rvI.(type) {
 	case []uint64:
-		return []uint64{}
+		return getMinUint64Slice(vals)
 	}
 	rv, _ := rvI.(uint64)
 	for _, val := range vals[1:] {
@@ -183,7 +215,7 @@ func MergeMax(vals []interface{}) interface{} {
 	rvI := vals[0]
 	switch rvI.(type) {
 	case []uint64:
-		return []uint64{}
+		return getMaxUint64Slice(vals)
 	}
 	rv, _ := rvI.(uint64)
 	for _, val := range vals[1:] {

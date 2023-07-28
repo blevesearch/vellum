@@ -149,9 +149,26 @@ func TestRoundTripSimple(t *testing.T) {
 }
 
 func TestRoundTripThousand(t *testing.T) {
-	dataset := thousandTestWords
-	randomThousandVals := randomValues(dataset)
+	b, err := New(nil, nil)
+	if err != nil {
+		t.Fatalf("error creating builder: %v", err)
+	}
 
+	testRoundTripThousand(t, b)
+}
+
+func TestRoundTripThousandBuilderIsReusable(t *testing.T) {
+	b, err := New(nil, nil)
+	if err != nil {
+		t.Fatalf("error creating builder: %v", err)
+	}
+
+	for i := 0; i < 1000; i++ {
+		testRoundTripThousand(t, b)
+	}
+}
+
+func testRoundTripThousand(t *testing.T, b *Builder) {
 	f, err := ioutil.TempFile("", "vellum")
 	if err != nil {
 		t.Fatal(err)
@@ -167,10 +184,13 @@ func TestRoundTripThousand(t *testing.T) {
 		}
 	}()
 
-	b, err := New(f, nil)
+	err = b.Reset(f)
 	if err != nil {
-		t.Fatalf("error creating builder: %v", err)
+		t.Fatalf("error resetting builder: %v", err)
 	}
+
+	dataset := thousandTestWords
+	randomThousandVals := randomValues(dataset)
 
 	err = insertStrings(b, dataset, randomThousandVals)
 	if err != nil {

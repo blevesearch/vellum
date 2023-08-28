@@ -298,3 +298,23 @@ type Reader struct {
 func (r *Reader) Get(input []byte) (uint64, bool, error) {
 	return r.f.get(input, &r.prealloc)
 }
+
+func (f *FST) GetTransitionsForState(state int) ([]byte, error) {
+	s, err := f.decoder.stateAt(state, nil)
+	if err != nil {
+		return nil, err
+	}
+	rv := make([]byte, s.NumTransitions())
+	for i := 0; i < s.NumTransitions(); i++ {
+		rv[i] = s.TransitionAt(i)
+	}
+	return rv, nil
+}
+
+func (f *FST) GetNumTransitionsForState(state int) (int, error) {
+	s, err := f.decoder.stateAt(state, nil)
+	if err != nil {
+		return -1, err
+	}
+	return s.NumTransitions(), nil
+}

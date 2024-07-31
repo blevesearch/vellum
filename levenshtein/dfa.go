@@ -28,23 +28,27 @@ type DFA struct {
 	ed          uint8
 }
 
-/// Returns the initial state
+// Returns the initial state
 func (d *DFA) initialState() int {
 	return d.initState
 }
 
-/// Returns the Levenshtein distance associated to the
-/// current state.
+// Returns the Levenshtein distance associated to the
+// current state.
 func (d *DFA) distance(stateId int) Distance {
 	return d.distances[stateId]
 }
 
-/// Returns the number of states in the `DFA`.
+func (d *DFA) EditDistance(stateId int) uint8 {
+	return d.distances[stateId].distance()
+}
+
+// Returns the number of states in the `DFA`.
 func (d *DFA) numStates() int {
 	return len(d.transitions)
 }
 
-/// Returns the destination state reached after consuming a given byte.
+// Returns the destination state reached after consuming a given byte.
 func (d *DFA) transition(fromState int, b uint8) int {
 	return int(d.transitions[fromState][b])
 }

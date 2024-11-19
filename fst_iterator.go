@@ -46,7 +46,7 @@ type Iterator interface {
 
 type FuzzyIterator interface {
 	Iterator
-	Distance() uint8
+	EditDistance() uint8
 }
 
 // FSTIterator is a structure for iterating key/value pairs in this FST in
@@ -81,7 +81,7 @@ func newIterator(f *FST, startKeyInclusive, endKeyExclusive []byte,
 	return rv, nil
 }
 
-func (i *FSTIterator) Distance() uint8 {
+func (i *FSTIterator) EditDistance() uint8 {
 	return i.keysDistance
 }
 

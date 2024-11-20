@@ -67,7 +67,7 @@ type FSTIterator struct {
 
 	nextStart []byte
 
-	keysDistance uint8
+	editDistance uint8
 }
 
 func newIterator(f *FST, startKeyInclusive, endKeyExclusive []byte,
@@ -82,7 +82,7 @@ func newIterator(f *FST, startKeyInclusive, endKeyExclusive []byte,
 }
 
 func (i *FSTIterator) EditDistance() uint8 {
-	return i.keysDistance
+	return i.editDistance
 }
 
 // Reset resets the Iterator' internal state to allow for iterator
@@ -218,7 +218,7 @@ OUTER:
 			cmp := bytes.Compare(i.keysStack, i.nextStart)
 			if cmp > 0 {
 				if fa, ok := i.aut.(FuzzyAutomaton); ok {
-					i.keysDistance = fa.EditDistance(autCurr)
+					i.editDistance = fa.EditDistance(autCurr)
 				}
 				// in final state greater than start key
 				return nil

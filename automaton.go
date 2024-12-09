@@ -87,4 +87,5 @@ var alwaysMatchAutomaton = &AlwaysMatch{}
 type FuzzyAutomaton interface {
 	Automaton
 	EditDistance(int) uint8
+	MatchAndDistance(input string) (bool, uint8)
 }

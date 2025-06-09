@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !nommap
 // +build !nommap
 
 package vellum
@@ -19,7 +20,7 @@ package vellum
 import (
 	"os"
 
-	mmap "github.com/blevesearch/mmap-go"
+	mmap "github.com/edsrzf/mmap-go"
 )
 
 type mmapWrapper struct {

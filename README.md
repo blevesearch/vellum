@@ -178,8 +178,8 @@ graphviz dot output data from an input vellum file.  The dot file can
 in turn be converted into an image using graphviz tools.  Example...
 
 ```shell
-    vellum dot myFile.vellum > output.dot
-    dot -Tpng output.dot -o output.png
+vellum dot myFile.vellum > output.dot
+dot -Tpng output.dot -o output.png
 ```
 
 ## Related Work

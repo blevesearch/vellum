@@ -25,24 +25,24 @@ To build an FST, create a new builder using the `New()` method.  This method tak
 In memory:
 
 ```go
-  var buf bytes.Buffer
-  builder, err := vellum.New(&buf, nil)
-  if err != nil {
-    log.Fatal(err)
-  }
+var buf bytes.Buffer
+builder, err := vellum.New(&buf, nil)
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
 To disk:
 
 ```go
-  f, err := os.Create("/tmp/vellum.fst")
-  if err != nil {
-    log.Fatal(err)
-  }
-  builder, err := vellum.New(f, nil)
-  if err != nil {
-    log.Fatal(err)
-  }
+f, err := os.Create("/tmp/vellum.fst")
+if err != nil {
+  log.Fatal(err)
+}
+builder, err := vellum.New(f, nil)
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
 **MUST** insert keys in lexicographic order:
@@ -76,47 +76,47 @@ After closing the builder, the data can be used to instantiate an FST.  If the d
 Load in memory:
 
 ```go
-  fst, err := vellum.Load(buf.Bytes())
-  if err != nil {
-    log.Fatal(err)
-  }
+fst, err := vellum.Load(buf.Bytes())
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
 Open from disk:
 
 ```go
-  fst, err := vellum.Open("/tmp/vellum.fst")
-  if err != nil {
-    log.Fatal(err)
-  }
+fst, err := vellum.Open("/tmp/vellum.fst")
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
 Get key/value:
 
 ```go
-  val, exists, err = fst.Get([]byte("dog"))
-  if err != nil {
-    log.Fatal(err)
-  }
-  if exists {
-    fmt.Printf("contains dog with val: %d\n", val)
-  } else {
-    fmt.Printf("does not contain dog")
-  }
+val, exists, err = fst.Get([]byte("dog"))
+if err != nil {
+  log.Fatal(err)
+}
+if exists {
+  fmt.Printf("contains dog with val: %d\n", val)
+} else {
+  fmt.Printf("does not contain dog")
+}
 ```
 
 Iterate key/values:
 
 ```go
-  itr, err := fst.Iterator(startKeyInclusive, endKeyExclusive)
-  for err == nil {
-    key, val := itr.Current()
-    fmt.Printf("contains key: %s val: %d", key, val)
-    err = itr.Next()
-  }
-  if err != nil {
-    log.Fatal(err)
-  }
+itr, err := fst.Iterator(startKeyInclusive, endKeyExclusive)
+for err == nil {
+  key, val := itr.Current()
+  fmt.Printf("contains key: %s val: %d", key, val)
+  err = itr.Next()
+}
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
 ### How does the FST get built?

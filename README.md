@@ -1,9 +1,8 @@
 # ![vellum](docs/logo.png) vellum
 
-[![Tests](https://github.com/couchbase/vellum/workflows/Tests/badge.svg?branch=master&event=push)](https://github.com/couchbase/vellum/actions?query=workflow%3ATests+event%3Apush+branch%3Amaster)
-[![Coverage Status](https://coveralls.io/repos/github/couchbase/vellum/badge.svg?branch=master)](https://coveralls.io/github/couchbase/vellum?branch=master)
-[![GoDoc](https://godoc.org/github.com/couchbase/vellum?status.svg)](https://godoc.org/github.com/couchbase/vellum)
-[![Go Report Card](https://goreportcard.com/badge/github.com/couchbase/vellum)](https://goreportcard.com/report/github.com/couchbase/vellum)
+[![Tests](https://github.com/blevesearch/vellum/actions/workflows/tests.yml/badge.svg?branch=master&event=push)](https://github.com/blevesearch/vellum/actions/workflows/tests.yml?query=event%3Apush+branch%3Amaster)
+[![Go Reference](https://pkg.go.dev/badge/github.com/blevesearch/vellum.svg)](https://pkg.go.dev/github.com/blevesearch/vellum)
+[![Go Report Card](https://goreportcard.com/badge/github.com/blevesearch/vellum)](https://goreportcard.com/report/github.com/blevesearch/vellum)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A Go library implementing an FST (finite state transducer) capable of:

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //go:build !nommap
+// +build !nommap
 
 package vellum
 

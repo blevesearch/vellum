@@ -6,13 +6,15 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A Go library implementing an FST (finite state transducer) capable of:
-  - mapping between keys ([]byte) and a value (uint64)
-  - enumerating keys in lexicographic order
+
+- mapping between keys ([]byte) and a value (uint64)
+- enumerating keys in lexicographic order
 
 Some additional goals of this implementation:
- - bounded memory use while building the FST
- - streaming out FST data while building
- - mmap FST runtime to support very large FTSs (optional)
+
+- bounded memory use while building the FST
+- streaming out FST data while building
+- mmap FST runtime to support very large FTSs (optional)
 
 ## Usage
 
@@ -21,6 +23,7 @@ Some additional goals of this implementation:
 To build an FST, create a new builder using the `New()` method.  This method takes an `io.Writer` as an argument.  As the FST is being built, data will be streamed to the writer as soon as possible.  With this builder you **MUST** insert keys in lexicographic order.  Inserting keys out of order will result in an error.  After inserting the last key into the builder, you **MUST** call `Close()` on the builder.  This will flush all remaining data to the underlying writer.
 
 In memory:
+
 ```go
   var buf bytes.Buffer
   builder, err := vellum.New(&buf, nil)
@@ -30,6 +33,7 @@ In memory:
 ```
 
 To disk:
+
 ```go
   f, err := os.Create("/tmp/vellum.fst")
   if err != nil {
@@ -42,6 +46,7 @@ To disk:
 ```
 
 **MUST** insert keys in lexicographic order:
+
 ```go
 err = builder.Insert([]byte("cat"), 1)
 if err != nil {
@@ -69,6 +74,7 @@ if err != nil {
 After closing the builder, the data can be used to instantiate an FST.  If the data was written to disk, you can use the `Open()` method to mmap the file.  If the data is already in memory, or you wish to load/mmap the data yourself, you can instantiate the FST with the `Load()` method.
 
 Load in memory:
+
 ```go
   fst, err := vellum.Load(buf.Bytes())
   if err != nil {
@@ -77,6 +83,7 @@ Load in memory:
 ```
 
 Open from disk:
+
 ```go
   fst, err := vellum.Open("/tmp/vellum.fst")
   if err != nil {
@@ -85,6 +92,7 @@ Open from disk:
 ```
 
 Get key/value:
+
 ```go
   val, exists, err = fst.Get([]byte("dog"))
   if err != nil {
@@ -98,6 +106,7 @@ Get key/value:
 ```
 
 Iterate key/values:
+
 ```go
   itr, err := fst.Iterator(startKeyInclusive, endKeyExclusive)
   for err == nil {
@@ -168,14 +177,17 @@ The vellum command-line tool has a "dot" subcommand that can emit
 graphviz dot output data from an input vellum file.  The dot file can
 in turn be converted into an image using graphviz tools.  Example...
 
-    $ vellum dot myFile.vellum > output.dot
-    $ dot -Tpng output.dot -o output.png
+```shell
+    vellum dot myFile.vellum > output.dot
+    dot -Tpng output.dot -o output.png
+```
 
 ## Related Work
 
 Much credit goes to two existing projects:
- - [mafsa](https://github.com/smartystreets/mafsa)
- - [BurntSushi/fst](https://github.com/BurntSushi/fst)
+
+- [mafsa](https://github.com/smartystreets/mafsa)
+- [BurntSushi/fst](https://github.com/BurntSushi/fst)
 
 Most of the original implementation here started with my digging into the internals of mafsa.  As the implementation progressed, I continued to borrow ideas/approaches from the BurntSushi/fst library as well.
 

@@ -411,19 +411,23 @@ func outputCat(l, r uint64) uint64 {
 	return l + r
 }
 
-// builderNodePool pools builderNodes using a singly linked list.
-//
-// NB: builderNode lifecylce is described by the following interactions -
-// +------------------------+                            +----------------------+
-// |    Unfinished Nodes    |      Transfer once         |        Registry      |
-// |(not frozen builderNode)|-----builderNode is ------->| (frozen builderNode) |
-// +------------------------+      marked frozen         +----------------------+
-//              ^                                                     |
-//              |                                                     |
-//              |                                                   Put()
-//              | Get() on        +-------------------+             when
-//              +-new char--------| builderNode Pool  |<-----------evicted
-//                                +-------------------+
+/*
+builderNodePool pools builderNodes using a singly linked list.
+
+NB: builderNode lifecylce is described by the following interactions -
++------------------------+                            +----------------------+
+|    Unfinished Nodes     |      Transfer once         |        Registry      |
+|(not frozen builderNode)|-----builderNode is ------->| (frozen builderNode) |
++------------------------+      marked frozen         +----------------------+
+
+	^                                                     ^
+	|                                                     |
+	|                                                     |
+	|                                                   Put()
+	| Get() on        +-------------------+             when
+	+-new char--------| builderNode Pool  |<-----------evicted
+					  +-------------------+
+*/
 type builderNodePool struct {
 	head *builderNode
 }

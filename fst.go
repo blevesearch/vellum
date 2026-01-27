@@ -160,7 +160,11 @@ func (f *FST) Accept(addr int, b byte) int {
 // IsMatchWithVal returns if this state is a matching state in this Automaton
 // and also returns the final output value for this state
 func (f *FST) IsMatchWithVal(addr int) (bool, uint64) {
-	s, err := f.decoder.stateAt(addr, nil)
+	return f.isMatchWithVal(addr, nil)
+}
+
+func (f *FST) isMatchWithVal(addr int, prealloc fstState) (bool, uint64) {
+	s, err := f.decoder.stateAt(addr, prealloc)
 	if err != nil {
 		return false, 0
 	}
@@ -170,7 +174,11 @@ func (f *FST) IsMatchWithVal(addr int) (bool, uint64) {
 // AcceptWithVal returns the next state for this Automaton on input of byte b
 // and also returns the output value for the transition
 func (f *FST) AcceptWithVal(addr int, b byte) (int, uint64) {
-	s, err := f.decoder.stateAt(addr, nil)
+	return f.acceptWithVal(addr, b, nil)
+}
+
+func (f *FST) acceptWithVal(addr int, b byte, prealloc fstState) (int, uint64) {
+	s, err := f.decoder.stateAt(addr, prealloc)
 	if err != nil {
 		return noneAddr, 0
 	}
@@ -289,7 +297,10 @@ func (f *FST) GetMaxKey() ([]byte, error) {
 	return rv, nil
 }
 
-// A Reader is meant for a single threaded use
+// A Reader can access states from the FST in a more efficient way. It is
+// useful for repeated lookups.
+//
+// A Reader may only be used by a single thread at a time.
 type Reader struct {
 	f        *FST
 	prealloc fstStateV1
@@ -297,4 +308,22 @@ type Reader struct {
 
 func (r *Reader) Get(input []byte) (uint64, bool, error) {
 	return r.f.get(input, &r.prealloc)
+}
+
+func (r *Reader) IsMatch(addr int) bool {
+	match, _ := r.IsMatchWithVal(addr)
+	return match
+}
+
+func (r *Reader) Accept(addr int, b byte) int {
+	next, _ := r.AcceptWithVal(addr, b)
+	return next
+}
+
+func (r *Reader) IsMatchWithVal(addr int) (bool, uint64) {
+	return r.f.isMatchWithVal(addr, &r.prealloc)
+}
+
+func (r *Reader) AcceptWithVal(addr int, b byte) (int, uint64) {
+	return r.f.acceptWithVal(addr, b, &r.prealloc)
 }

@@ -16,6 +16,7 @@ package vellum
 
 import (
 	"io"
+	"sync"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -31,6 +32,13 @@ type FST struct {
 	typ     int
 	data    []byte
 	decoder decoder
+
+	// statePool recycles transient fstState instances used by the
+	// Automaton/Transducer interface methods (Accept/AcceptWithVal,
+	// IsMatch/IsMatchWithVal), which would otherwise allocate a fresh
+	// state on every call. The pool is safe for concurrent use, so the
+	// FST remains usable from multiple goroutines.
+	statePool sync.Pool
 }
 
 func new(data []byte, f io.Closer) (rv *FST, err error) {
@@ -160,21 +168,26 @@ func (f *FST) Accept(addr int, b byte) int {
 // IsMatchWithVal returns if this state is a matching state in this Automaton
 // and also returns the final output value for this state
 func (f *FST) IsMatchWithVal(addr int) (bool, uint64) {
-	s, err := f.decoder.stateAt(addr, nil)
+	prealloc, _ := f.statePool.Get().(fstState)
+	s, err := f.decoder.stateAt(addr, prealloc)
 	if err != nil {
 		return false, 0
 	}
-	return s.Final(), s.FinalOutput()
+	final, out := s.Final(), s.FinalOutput()
+	f.statePool.Put(s)
+	return final, out
 }
 
 // AcceptWithVal returns the next state for this Automaton on input of byte b
 // and also returns the output value for the transition
 func (f *FST) AcceptWithVal(addr int, b byte) (int, uint64) {
-	s, err := f.decoder.stateAt(addr, nil)
+	prealloc, _ := f.statePool.Get().(fstState)
+	s, err := f.decoder.stateAt(addr, prealloc)
 	if err != nil {
 		return noneAddr, 0
 	}
 	_, next, output := s.TransitionFor(b)
+	f.statePool.Put(s)
 	return next, output
 }
 

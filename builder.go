@@ -146,7 +146,7 @@ func (b *Builder) compileFrom(iState int) error {
 		var err error
 		addr, err = b.compile(node)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 	b.unfinished.topLastFreeze(addr)

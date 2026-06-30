@@ -18,6 +18,24 @@ import (
 	"testing"
 )
 
+func BenchmarkNewLevenshteinAutomatonBuilder1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, err := NewLevenshteinAutomatonBuilder(1, true)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkNewLevenshteinAutomatonBuilder2(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, err := NewLevenshteinAutomatonBuilder(2, false)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkNewEvalEditDistance1(b *testing.B) {
 	lb, _ := NewLevenshteinAutomatonBuilder(1, true)
 

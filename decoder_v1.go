@@ -261,6 +261,29 @@ func (f *fstStateV1) TransitionFor(b byte) (int, int, uint64) {
 	return f.numTrans - pos - 1, dest, out
 }
 
+func (f *fstStateV1) TransitionDestForOffset(i int) (int, uint64) {
+	if f.isEncodedSingle() {
+		return int(f.singleTransAddr), f.singleTransOut
+	}
+	// transitions are stored reversed, so sorted offset i lives at reversed
+	// position numTrans-i-1 across the dest/output arrays.
+	pos := f.numTrans - i - 1
+
+	transDests := f.data[f.destBottom:f.destTop]
+	dest := int(readPackedUint(transDests[pos*f.transSize : pos*f.transSize+f.transSize]))
+	if dest > 0 {
+		// convert delta
+		dest = f.bottom - dest
+	}
+
+	var out uint64
+	if f.outSize > 0 {
+		transVals := f.data[f.outBottom:f.outTop]
+		out = readPackedUint(transVals[pos*f.outSize : pos*f.outSize+f.outSize])
+	}
+	return dest, out
+}
+
 func (f *fstStateV1) String() string {
 	rv := ""
 	rv += fmt.Sprintf("State: %d (%#x)", f.top, f.top)

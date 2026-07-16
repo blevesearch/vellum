@@ -84,4 +84,10 @@ type fstState interface {
 	NumTransitions() int
 	TransitionFor(b byte) (int, int, uint64)
 	TransitionAt(i int) byte
+	// TransitionDestForOffset returns the destination address and output for
+	// the transition at sorted offset i, without searching by key. Callers
+	// enumerating transitions in order (e.g. the automaton-guided iterator)
+	// already know the offset from TransitionAt, so this avoids the redundant
+	// key lookup that TransitionFor would perform.
+	TransitionDestForOffset(i int) (int, uint64)
 }

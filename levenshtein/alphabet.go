@@ -17,6 +17,7 @@ package levenshtein
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -78,16 +79,17 @@ func (a *Alphabet) next() (rune, FullCharacteristicVector, error) {
 
 func dedupe(in string) string {
 	lookUp := make(map[rune]struct{}, len(in))
-	var rv string
+	var sb strings.Builder
+	sb.Grow(len(in))
 	for len(in) > 0 {
 		r, size := utf8.DecodeRuneInString(in)
 		in = in[size:]
 		if _, ok := lookUp[r]; !ok {
-			rv += string(r)
+			sb.WriteRune(r)
 			lookUp[r] = struct{}{}
 		}
 	}
-	return rv
+	return sb.String()
 }
 
 func queryChars(qChars string) Alphabet {

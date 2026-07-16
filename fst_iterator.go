@@ -240,7 +240,12 @@ OUTER:
 				continue INNER
 			}
 
-			pos, nextAddr, v := curr.TransitionFor(t)
+			// only now that the automaton has accepted do we resolve the
+			// dest/output - by offset, so no key search is needed. The sorted
+			// offset is exactly the position recorded on the stack
+			// (TransitionFor returns numTrans-revpos-1 == offset).
+			nextAddr, v := curr.TransitionDestForOffset(nextOffset)
+			pos := nextOffset
 
 			// the next slot in the statesStack might have an
 			// fstState instance that we can reuse

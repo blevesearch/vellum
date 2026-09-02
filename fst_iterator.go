@@ -16,6 +16,7 @@ package vellum
 
 import (
 	"bytes"
+	"fmt"
 )
 
 // Iterator represents a means of visiting key/value pairs in order.
@@ -52,14 +53,22 @@ type FuzzyIterator interface {
 // FSTIterator is a structure for iterating key/value pairs in this FST in
 // lexicographic order.  Iterators should be constructed with the FSTIterator
 // method on the parent FST structure.
+//
+// statesStack holds fstStateV1 VALUES, not the fstState interface - decoderV1
+// is the only registered decoder, so the interface/registry machinery in
+// encoding.go (kept for FST.Get/Debug and any future decoder version) buys
+// this hot loop nothing but per-visit interface boxing and 3-5 avoidable
+// dynamic dispatches per edge. dv1 is resolved once, in Reset, rather than
+// type-asserted on every state visit.
 type FSTIterator struct {
 	f   *FST
+	dv1 *decoderV1
 	aut Automaton
 
 	startKeyInclusive []byte
 	endKeyExclusive   []byte
 
-	statesStack    []fstState
+	statesStack    []fstStateV1
 	keysStack      []byte
 	keysPosStack   []int
 	valsStack      []uint64
@@ -68,6 +77,24 @@ type FSTIterator struct {
 	nextStart []byte
 
 	editDistance uint8
+}
+
+// pushState decodes the state at addr into a freshly appended slot in
+// statesStack and returns a pointer to it. Appending a VALUE (not a pointer
+// or interface) lets append's normal capacity-reuse do what the old
+// nextPrealloc dance did explicitly, with no boxing - fstStateV1.at is
+// total for every field any read method can access for its outcome (see
+// atSingle/atMulti/atZero/atNone's doc comments in decoder_v1.go), so
+// decoding into reused backing-array memory is exactly as safe as it was
+// through decoder.stateAt's old prealloc parameter.
+func (i *FSTIterator) pushState(addr int) (*fstStateV1, error) {
+	i.statesStack = append(i.statesStack, fstStateV1{})
+	s := &i.statesStack[len(i.statesStack)-1]
+	if err := s.at(i.dv1.data, addr); err != nil {
+		i.statesStack = i.statesStack[:len(i.statesStack)-1]
+		return nil, err
+	}
+	return s, nil
 }
 
 func newIterator(f *FST, startKeyInclusive, endKeyExclusive []byte,
@@ -89,11 +116,17 @@ func (i *FSTIterator) EditDistance() uint8 {
 // reuse (e.g. pooling).
 func (i *FSTIterator) Reset(f *FST,
 	startKeyInclusive, endKeyExclusive []byte, aut Automaton) error {
+	dv1, ok := f.decoder.(*decoderV1)
+	if !ok {
+		return fmt.Errorf("vellum: FSTIterator requires a v1 decoder, got %T", f.decoder)
+	}
+
 	if aut == nil {
 		aut = alwaysMatchAutomaton
 	}
 
 	i.f = f
+	i.dv1 = dv1
 	i.startKeyInclusive = startKeyInclusive
 	i.endKeyExclusive = endKeyExclusive
 	i.aut = aut
@@ -121,7 +154,7 @@ func (i *FSTIterator) pointTo(key []byte) error {
 	i.valsStack = i.valsStack[:0]
 	i.autStatesStack = i.autStatesStack[:0]
 
-	root, err := i.f.decoder.stateAt(i.f.decoder.getRoot(), nil)
+	curr, err := i.pushState(i.dv1.getRoot())
 	if err != nil {
 		return err
 	}
@@ -130,11 +163,9 @@ func (i *FSTIterator) pointTo(key []byte) error {
 
 	maxQ := -1
 	// root is always part of the path
-	i.statesStack = append(i.statesStack, root)
 	i.autStatesStack = append(i.autStatesStack, autStart)
 	for j := 0; j < len(key); j++ {
 		keyJ := key[j]
-		curr := i.statesStack[len(i.statesStack)-1]
 		autCurr := i.autStatesStack[len(i.autStatesStack)-1]
 
 		pos, nextAddr, nextVal := curr.TransitionFor(keyJ)
@@ -151,16 +182,16 @@ func (i *FSTIterator) pointTo(key []byte) error {
 		}
 		autNext := i.aut.Accept(autCurr, keyJ)
 
-		next, err := i.f.decoder.stateAt(nextAddr, nil)
+		next, err := i.pushState(nextAddr)
 		if err != nil {
 			return err
 		}
 
-		i.statesStack = append(i.statesStack, next)
 		i.keysStack = append(i.keysStack, keyJ)
 		i.keysPosStack = append(i.keysPosStack, pos)
 		i.valsStack = append(i.valsStack, nextVal)
 		i.autStatesStack = append(i.autStatesStack, autNext)
+		curr = next
 		continue
 	}
 
@@ -177,7 +208,7 @@ func (i *FSTIterator) pointTo(key []byte) error {
 // If the iterator is not pointing at a valid value (because Iterator/Next/Seek)
 // returned an error previously, it may return nil,0.
 func (i *FSTIterator) Current() ([]byte, uint64) {
-	curr := i.statesStack[len(i.statesStack)-1]
+	curr := &i.statesStack[len(i.statesStack)-1]
 	if curr.Final() {
 		var total uint64
 		for _, v := range i.valsStack {
@@ -205,7 +236,7 @@ func (i *FSTIterator) next(lastOffset int) error {
 
 OUTER:
 	for true {
-		curr := i.statesStack[len(i.statesStack)-1]
+		curr := &i.statesStack[len(i.statesStack)-1]
 		autCurr := i.autStatesStack[len(i.autStatesStack)-1]
 
 		if curr.Final() && i.aut.IsMatch(autCurr) && allowCompare {
@@ -246,20 +277,10 @@ OUTER:
 			// decode the dest/output directly instead.
 			nextAddr, v := curr.TransitionDestAt(nextOffset)
 
-			// the next slot in the statesStack might have an
-			// fstState instance that we can reuse
-			var nextPrealloc fstState
-			if len(i.statesStack) < cap(i.statesStack) {
-				nextPrealloc = i.statesStack[0:cap(i.statesStack)][len(i.statesStack)]
-			}
-
-			// push onto stack
-			next, err := i.f.decoder.stateAt(nextAddr, nextPrealloc)
-			if err != nil {
+			if _, err := i.pushState(nextAddr); err != nil {
 				return err
 			}
 
-			i.statesStack = append(i.statesStack, next)
 			i.keysStack = append(i.keysStack, t)
 			i.keysPosStack = append(i.keysPosStack, nextOffset)
 			i.valsStack = append(i.valsStack, v)

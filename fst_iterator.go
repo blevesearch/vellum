@@ -260,6 +260,7 @@ OUTER:
 
 	INNER:
 		for nextOffset < numTrans {
+			statsEdgeVisited()
 			t := curr.TransitionAt(nextOffset)
 
 			autNext := i.aut.Accept(autCurr, t)
@@ -276,6 +277,7 @@ OUTER:
 			// exactly what we just fetched t from via TransitionAt - so
 			// decode the dest/output directly instead.
 			nextAddr, v := curr.TransitionDestAt(nextOffset)
+			statsPairPushed(nextAddr, autNext)
 
 			if _, err := i.pushState(nextAddr); err != nil {
 				return err

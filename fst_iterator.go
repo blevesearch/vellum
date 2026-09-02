@@ -240,7 +240,11 @@ OUTER:
 				continue INNER
 			}
 
-			pos, nextAddr, v := curr.TransitionFor(t)
+			// nextOffset (i.e. the position TransitionFor would recompute
+			// via a linear IndexByte scan) is already known here - it's
+			// exactly what we just fetched t from via TransitionAt - so
+			// decode the dest/output directly instead.
+			nextAddr, v := curr.TransitionDestAt(nextOffset)
 
 			// the next slot in the statesStack might have an
 			// fstState instance that we can reuse
@@ -257,7 +261,7 @@ OUTER:
 
 			i.statesStack = append(i.statesStack, next)
 			i.keysStack = append(i.keysStack, t)
-			i.keysPosStack = append(i.keysPosStack, pos)
+			i.keysPosStack = append(i.keysPosStack, nextOffset)
 			i.valsStack = append(i.valsStack, v)
 			i.autStatesStack = append(i.autStatesStack, autNext)
 

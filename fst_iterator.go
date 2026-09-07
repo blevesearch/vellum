@@ -97,10 +97,38 @@ func (i *FSTIterator) pushState(addr int) (*fstStateV1, error) {
 	return s, nil
 }
 
+// initialStackDepth pre-sizes a fresh iterator's per-depth stacks so a
+// typical-length key (bleve/zapx build one FSTIterator per query per
+// segment, so this cost is paid on every query, not amortized) never has to
+// grow them via append at all. Sized for typical term lengths, not a hard
+// cap - append still grows past this for a longer key.
+//
+// statesStack is the one that matters most: fstStateV1 is 152 bytes, so
+// growing it from nil via append's normal capacity-doubling was measured to
+// roughly double this iterator's total bytes/op across every walk/get/scan
+// benchmark relative to the pre-specialization (interface-boxed) design,
+// even though it's also measurably faster (no interface dispatch). This
+// closes most of that regression without giving back the speed win.
+//
+// 16, not higher: tried 32, which helps long-key benchmarks further
+// (BenchmarkSuffixWalkRealistic's real English-word-plus-suffix keys) but
+// actively regresses short-key ones (BenchmarkOptScanWide's 8-byte keys,
+// BenchmarkOptFuzzyWords1's short query) by more than it gains, since most
+// of those depths then go unused. There's no single constant optimal for
+// every key-length distribution without knowing it in advance; 16 is the
+// better balance of the two measured.
+const initialStackDepth = 16
+
 func newIterator(f *FST, startKeyInclusive, endKeyExclusive []byte,
 	aut Automaton) (*FSTIterator, error) {
 
-	rv := &FSTIterator{}
+	rv := &FSTIterator{
+		statesStack:    make([]fstStateV1, 0, initialStackDepth),
+		keysStack:      make([]byte, 0, initialStackDepth),
+		keysPosStack:   make([]int, 0, initialStackDepth),
+		valsStack:      make([]uint64, 0, initialStackDepth),
+		autStatesStack: make([]int, 0, initialStackDepth),
+	}
 	err := rv.Reset(f, startKeyInclusive, endKeyExclusive, aut)
 	if err != nil {
 		return nil, err

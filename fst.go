@@ -253,7 +253,17 @@ func (a addrStack) Pop() (addrStack, int) {
 // Reader() returns a Reader instance that a single thread may use to
 // retrieve data from the FST
 func (f *FST) Reader() (*Reader, error) {
-	return &Reader{f: f}, nil
+	r := &Reader{f: f, rootAddr: f.decoder.getRoot()}
+	// Parse the root state once and cache it. The root is traversed on every
+	// Get, so caching the (immutable) parsed form lets each lookup skip
+	// re-decoding it - a per-call saving on top of avoiding the state alloc.
+	rs, err := f.decoder.stateAt(r.rootAddr, &r.root)
+	if err == nil {
+		if _, ok := rs.(*fstStateV1); ok {
+			r.hasRoot = true
+		}
+	}
+	return r, nil
 }
 
 func (f *FST) GetMinKey() ([]byte, error) {
@@ -306,8 +316,38 @@ func (f *FST) GetMaxKey() ([]byte, error) {
 type Reader struct {
 	f        *FST
 	prealloc fstStateV1
+
+	// root holds the pre-parsed root state; it is copied into prealloc at the
+	// start of each Get so the root never has to be re-decoded.
+	rootAddr int
+	hasRoot  bool
+	root     fstStateV1
 }
 
 func (r *Reader) Get(input []byte) (uint64, bool, error) {
-	return r.f.get(input, &r.prealloc)
+	if !r.hasRoot {
+		return r.f.get(input, &r.prealloc)
+	}
+
+	var total uint64
+	r.prealloc = r.root // reuse the cached, already-decoded root
+	state := &r.prealloc
+	for _, c := range input {
+		_, curr, output := state.TransitionFor(c)
+		if curr == noneAddr {
+			return 0, false, nil
+		}
+		next, err := r.f.decoder.stateAt(curr, state)
+		if err != nil {
+			return 0, false, err
+		}
+		state = next.(*fstStateV1)
+		total += output
+	}
+
+	if state.Final() {
+		total += state.FinalOutput()
+		return total, true, nil
+	}
+	return 0, false, nil
 }

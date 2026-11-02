@@ -15,8 +15,7 @@
 package levenshtein
 
 import (
-	"crypto/sha256"
-	"encoding/json"
+	"encoding/binary"
 	"fmt"
 	"math"
 )
@@ -311,13 +310,14 @@ func fromNfa(nfa *LevenshteinNFA) (*ParametricDFA, error) {
 }
 
 type hash struct {
-	index map[[32]byte]int
-	items []MultiState
+	index  map[string]int
+	items  []MultiState
+	keyBuf []byte
 }
 
 func newHash() *hash {
 	return &hash{
-		index: make(map[[32]byte]int, 100),
+		index: make(map[string]int, 100),
 		items: make([]MultiState, 0, 100),
 	}
 }
@@ -326,9 +326,11 @@ func (h *hash) getOrAllocate(m MultiState) int {
 	size := len(h.items)
 	var exists bool
 	var pos int
-	sha := getHash(&m)
-	if pos, exists = h.index[sha]; !exists {
-		h.index[sha] = size
+	h.keyBuf = encodeMultiState(&m, h.keyBuf)
+	if pos, exists = h.index[string(h.keyBuf)]; !exists {
+		// string(h.keyBuf) allocates a fresh, immutable copy for the map key,
+		// so reusing h.keyBuf on the next call is safe.
+		h.index[string(h.keyBuf)] = size
 		pos = size
 		h.items = append(h.items, m)
 	}
@@ -339,11 +341,25 @@ func (h *hash) getFromID(id int) *MultiState {
 	return &h.items[id]
 }
 
-func getHash(ms *MultiState) [32]byte {
-	msBytes := []byte{}
-	for _, state := range ms.states {
-		jsonBytes, _ := json.Marshal(&state)
-		msBytes = append(msBytes, jsonBytes...)
+// encodeMultiState serializes ms into buf (reusing its capacity) as an exact,
+// collision-free key: 6 bytes per NFAState (4 offset, 1 distance, 1 transpose).
+func encodeMultiState(ms *MultiState, buf []byte) []byte {
+	const stateSize = 6
+	need := len(ms.states) * stateSize
+	if cap(buf) < need {
+		buf = make([]byte, need)
+	} else {
+		buf = buf[:need]
 	}
-	return sha256.Sum256(msBytes)
+	for i, state := range ms.states {
+		off := i * stateSize
+		binary.LittleEndian.PutUint32(buf[off:], state.Offset)
+		buf[off+4] = state.Distance
+		if state.InTranspose {
+			buf[off+5] = 1
+		} else {
+			buf[off+5] = 0
+		}
+	}
+	return buf
 }

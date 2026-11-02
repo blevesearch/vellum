@@ -62,6 +62,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             16,
 				bottom:          16,
 				singleTransChar: 'a',
@@ -82,6 +83,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             17,
 				bottom:          16,
 				singleTransChar: 0xff,
@@ -103,6 +105,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             18,
 				bottom:          16,
 				singleTransChar: 'a',
@@ -126,6 +129,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             19,
 				bottom:          16,
 				singleTransChar: 0xff,
@@ -149,6 +153,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             19,
 				bottom:          16,
 				singleTransChar: 'a',
@@ -175,6 +180,7 @@ func TestDecoderStateAt(t *testing.T) {
 			},
 			&fstStateV1{
 				numTrans:        1,
+				single:          true,
 				top:             20,
 				bottom:          16,
 				singleTransChar: 0xff,
@@ -211,6 +217,14 @@ func TestDecoderStateAt(t *testing.T) {
 				destTop:     19,
 				transBottom: 19,
 				transTop:    22,
+				// outSize == 0: atMulti sets outBottom/outTop to the
+				// current f.bottom (a valid, empty f.data[x:x] slice)
+				// rather than leaving them 0, so a reused struct's
+				// TransitionFor/TransitionDestAt can safely take an
+				// unconditional f.data[outBottom:outTop] slice regardless
+				// of what FST it was last decoded against.
+				outBottom: 16,
+				outTop:    16,
 			},
 		},
 		{
@@ -339,6 +353,8 @@ func TestDecoderStateAt(t *testing.T) {
 				destTop:     272,
 				transBottom: 272,
 				transTop:    528,
+				outBottom:   16,
+				outTop:      16,
 			},
 		},
 	}
@@ -435,6 +451,7 @@ func TestFSTStateTransitionAt(t *testing.T) {
 	state := fstStateV1{
 		data:            []byte{oneTransition | encodeCommon('a')},
 		numTrans:        1,
+		single:          true,
 		singleTransChar: 'a',
 	}
 	got := state.TransitionAt(0)

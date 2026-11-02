@@ -57,11 +57,14 @@ func (d *decoderV1) getLen() int {
 
 func (d *decoderV1) stateAt(addr int, prealloc fstState) (fstState, error) {
 	state, ok := prealloc.(*fstStateV1)
-	if ok && state != nil {
-		*state = fstStateV1{} // clear the struct
-	} else {
+	if !ok || state == nil {
 		state = &fstStateV1{}
 	}
+	// No struct-clear here: at()'s two branches (atSingle/atMulti) are each
+	// total with respect to every field the rest of this type's methods
+	// can actually read for that branch's f.single value - see the "total"
+	// comments on atSingle/atMulti for exactly which field required this
+	// and why a stale value would otherwise be observable across reuse.
 	err := state.at(d.data, addr)
 	if err != nil {
 		return nil, err
@@ -74,6 +77,7 @@ type fstStateV1 struct {
 	top      int
 	bottom   int
 	numTrans int
+	single   bool
 
 	// single trans only
 	singleTransChar byte
@@ -115,18 +119,45 @@ func (f *fstStateV1) at(data []byte, addr int) error {
 	}
 	f.top = addr
 	f.bottom = addr
-	if f.isEncodedSingle() {
+	// Read and cache once per visit instead of on every TransitionAt/
+	// TransitionFor/TransitionDestAt call (each of those used to call
+	// isEncodedSingle() itself - a re-read of f.data[f.top], often a
+	// different cache line than the transition data those methods go on
+	// to touch).
+	f.single = f.isEncodedSingle()
+	if f.single {
 		return f.atSingle(data, addr)
 	}
 	return f.atMulti(data, addr)
 }
 
+// atZero and atNone both represent numTrans==0 ("no outgoing transitions")
+// states, but none of TransitionAt/TransitionFor/TransitionDestAt actually
+// gate on numTrans==0 - they unconditionally slice
+// f.data[f.transBottom:f.transTop] (and destBottom:destTop, outBottom:
+// outTop) and search within it, relying entirely on that slice being
+// EMPTY (transBottom==transTop) for a numTrans==0 state to correctly find
+// no match. A reused prealloc'd struct whose last decode was a real
+// multi-transition state would otherwise leave these fields non-empty and
+// stale, so TransitionFor could spuriously "find" an unrelated byte within
+// that leftover range and compute a bogus destination address from
+// whatever garbage sits at the corresponding (equally stale) destBottom:
+// destTop position - not a hypothetical, this is exactly what produced a
+// negative address surfacing as "invalid address" several calls later.
+// outSize must also be cleared: FinalOutput() reads f.data[outFinal:
+// outFinal+outSize] whenever final && outSize>0, and this path never
+// otherwise sets outSize.
 func (f *fstStateV1) atZero() error {
 	f.top = 0
 	f.bottom = 1
 	f.numTrans = 0
+	f.single = false
 	f.final = true
+	f.transBottom, f.transTop = 0, 0
+	f.destBottom, f.destTop = 0, 0
+	f.outBottom, f.outTop = 0, 0
 	f.outFinal = 0
+	f.outSize = 0
 	return nil
 }
 
@@ -134,14 +165,29 @@ func (f *fstStateV1) atNone() error {
 	f.top = 0
 	f.bottom = 1
 	f.numTrans = 0
+	f.single = false
 	f.final = false
+	f.transBottom, f.transTop = 0, 0
+	f.destBottom, f.destTop = 0, 0
+	f.outBottom, f.outTop = 0, 0
 	f.outFinal = 0
+	f.outSize = 0
 	return nil
 }
 
+// atSingle is "total" with respect to every field this type's methods can
+// read when f.single is true: numTrans, the singleTrans* fields below, and
+// - the one easy to miss - final, which single-transition nodes can never
+// truthfully have (the encoder always takes the many-transition path for
+// any final node, see encoder_v1.go's encodeState), but which Final() reads
+// unconditionally regardless of f.single. Without this, a state struct
+// reused (via stateAt's prealloc) from a previous final multi-transition
+// decode would leak a stale final=true into this single-transition one.
 func (f *fstStateV1) atSingle(data []byte, addr int) error {
 	// handle single transition case
 	f.numTrans = 1
+	f.final = false
+	f.outFinal = 0
 	f.singleTransNext = data[f.top]&transitionNext > 0
 	f.singleTransChar = data[f.top] & maxCommon
 	if f.singleTransChar == 0 {
@@ -203,7 +249,22 @@ func (f *fstStateV1) atMulti(data []byte, addr int) error {
 		if f.final {
 			f.bottom -= f.outSize
 			f.outFinal = f.bottom
+		} else {
+			f.outFinal = 0
 		}
+	} else {
+		// Total even when there's nothing to decode: TransitionFor takes
+		// an unconditional f.data[f.outBottom:f.outTop] slice regardless
+		// of outSize (only the subsequent index into it is guarded), so
+		// stale bottom/top from this same struct's previous use - a
+		// different FST, reused via Reset()'s iterator pooling, which
+		// bleve's automaton-per-dictionary-lookup path (e.g. geo queries
+		// constructing many small automatons) does heavily - could
+		// otherwise violate len(f.data) and panic, or silently slice
+		// nonsense out of the new, unrelated buffer.
+		f.outTop = f.bottom
+		f.outBottom = f.bottom
+		f.outFinal = 0
 	}
 	return nil
 }
@@ -228,15 +289,43 @@ func (f *fstStateV1) NumTransitions() int {
 }
 
 func (f *fstStateV1) TransitionAt(i int) byte {
-	if f.isEncodedSingle() {
+	if f.single {
 		return f.singleTransChar
 	}
 	transitionKeys := f.data[f.transBottom:f.transTop]
 	return transitionKeys[f.numTrans-i-1]
 }
 
+// TransitionDestAt returns the destination address and output value for
+// the i'th transition in ascending byte order (the same i TransitionAt
+// takes) - equivalent to the 2nd/3rd results of
+// TransitionFor(TransitionAt(i)), but computes the position directly
+// instead of re-deriving it via TransitionFor's bytes.IndexByte scan,
+// which the caller (FSTIterator.next) already knows since it just got i
+// from TransitionAt. Kept as a separate call from TransitionAt rather than
+// merged into one, so a rejected edge (the common case for a
+// well-pruning automaton like Levenshtein) doesn't pay for a dest/output
+// decode it won't use.
+func (f *fstStateV1) TransitionDestAt(i int) (int, uint64) {
+	if f.single {
+		return int(f.singleTransAddr), f.singleTransOut
+	}
+	pos := f.numTrans - i - 1
+	transDests := f.data[f.destBottom:f.destTop]
+	dest := int(readPackedUint(transDests[pos*f.transSize : pos*f.transSize+f.transSize]))
+	if dest > 0 {
+		dest = f.bottom - dest
+	}
+	var out uint64
+	if f.outSize > 0 {
+		transVals := f.data[f.outBottom:f.outTop]
+		out = readPackedUint(transVals[pos*f.outSize : pos*f.outSize+f.outSize])
+	}
+	return dest, out
+}
+
 func (f *fstStateV1) TransitionFor(b byte) (int, int, uint64) {
-	if f.isEncodedSingle() {
+	if f.single {
 		if f.singleTransChar == b {
 			return 0, int(f.singleTransAddr), f.singleTransOut
 		}

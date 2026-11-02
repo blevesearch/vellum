@@ -43,7 +43,7 @@ func newDfaBuilder(insts prog) *dfaBuilder {
 	}
 	// add 0 state that is invalid
 	d.dfa.states = append(d.dfa.states, state{
-		next:  make([]int, 256),
+		next:  make([]uint32, 256),
 		match: false,
 	})
 	return d
@@ -87,7 +87,7 @@ func (d *dfaBuilder) runState(cur, next *sparseSet, state int, b byte, instsReus
 	d.dfa.run(cur, next, b)
 	var nextState int
 	nextState, instsReuse = d.cachedState(next, instsReuse)
-	d.dfa.states[state].next[b] = nextState
+	d.dfa.states[state].next[b] = uint32(nextState)
 	return nextState, instsReuse
 }
 
@@ -130,7 +130,7 @@ func (d *dfaBuilder) cachedState(set *sparseSet,
 	}
 	d.dfa.states = append(d.dfa.states, state{
 		insts: insts,
-		next:  make([]int, 256),
+		next:  make([]uint32, 256),
 		match: isMatch,
 	})
 	newV := len(d.dfa.states) - 1
@@ -177,7 +177,10 @@ func (d *dfa) run(from, to *sparseSet, b byte) bool {
 
 type state struct {
 	insts []uint
-	next  []int
+	// next holds the destination state index for each of the 256 input
+	// bytes. State indices are bounded by StateLimit, so uint32 is always
+	// sufficient and halves the table size versus int on 64-bit platforms.
+	next  []uint32
 	match bool
 }
 

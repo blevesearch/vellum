@@ -113,7 +113,7 @@ func (r *Regexp) WillAlwaysMatch(int) bool {
 // when currently in the state s.
 func (r *Regexp) Accept(s int, b byte) int {
 	if s < len(r.dfa.states) {
-		return r.dfa.states[s].next[b]
+		return int(r.dfa.states[s].next[b])
 	}
 	return 0
 }

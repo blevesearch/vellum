@@ -84,4 +84,10 @@ type fstState interface {
 	NumTransitions() int
 	TransitionFor(b byte) (int, int, uint64)
 	TransitionAt(i int) byte
+	// TransitionDestAt returns the destination address and output value
+	// for the i'th transition in ascending byte order (the same i
+	// TransitionAt takes) - equivalent to the 2nd/3rd results of
+	// TransitionFor(TransitionAt(i)) but without re-deriving the position
+	// via a linear scan when the caller already has it.
+	TransitionDestAt(i int) (int, uint64)
 }
